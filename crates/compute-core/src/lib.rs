@@ -11,7 +11,10 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
 
-const MAX_DECIMAL_SCALE: u32 = 38;
+pub mod expression;
+mod precision;
+
+use precision::MAX_DECIMAL_SCALE;
 
 /// Current foundation API status for downstream scaffolds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,7 +145,7 @@ pub struct ComputeError {
 }
 
 impl ComputeError {
-    fn invalid_input(message: impl Into<String>) -> Self {
+    pub(crate) fn invalid_input(message: impl Into<String>) -> Self {
         Self {
             code: ErrorCode::InvalidInput,
             message: message.into(),
@@ -150,7 +153,7 @@ impl ComputeError {
         }
     }
 
-    fn division_by_zero() -> Self {
+    pub(crate) fn division_by_zero() -> Self {
         Self {
             code: ErrorCode::DivisionByZero,
             message: "division by zero".to_owned(),
@@ -158,7 +161,7 @@ impl ComputeError {
         }
     }
 
-    fn precision_issue(message: impl Into<String>) -> Self {
+    pub(crate) fn precision_issue(message: impl Into<String>) -> Self {
         Self {
             code: ErrorCode::PrecisionIssue,
             message: message.into(),
@@ -166,7 +169,16 @@ impl ComputeError {
         }
     }
 
-    fn overflow(message: impl Into<String>) -> Self {
+    pub(crate) fn repeating_decimal_expansion() -> Self {
+        Self::precision_issue(REPEATING_DECIMAL_EXPANSION_MESSAGE)
+    }
+
+    pub(crate) fn is_repeating_decimal_expansion(&self) -> bool {
+        self.code == ErrorCode::PrecisionIssue
+            && self.message == REPEATING_DECIMAL_EXPANSION_MESSAGE
+    }
+
+    pub(crate) fn overflow(message: impl Into<String>) -> Self {
         Self {
             code: ErrorCode::Overflow,
             message: message.into(),
@@ -174,6 +186,9 @@ impl ComputeError {
         }
     }
 }
+
+const REPEATING_DECIMAL_EXPANSION_MESSAGE: &str =
+    "division result has a repeating decimal expansion";
 
 impl fmt::Display for ComputeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -769,7 +784,10 @@ fn multiply_by_repeated_factor(
     Ok(value)
 }
 
-fn apply_precision(value: Number, precision: PrecisionPolicy) -> Result<Number, ComputeError> {
+pub(crate) fn apply_precision(
+    value: Number,
+    precision: PrecisionPolicy,
+) -> Result<Number, ComputeError> {
     let Some(decimal_places) = precision.decimal_places else {
         return Ok(value);
     };
@@ -840,9 +858,7 @@ fn divide_exact(numerator: i128, denominator: i128) -> Result<i128, ComputeError
     if remainder == 0 {
         Ok(quotient)
     } else {
-        Err(ComputeError::precision_issue(
-            "division result has a repeating decimal expansion",
-        ))
+        Err(ComputeError::repeating_decimal_expansion())
     }
 }
 
@@ -934,9 +950,7 @@ fn terminating_scale(denominator: i128) -> Result<u32, ComputeError> {
     }
 
     if remaining.unsigned_abs() != 1 {
-        return Err(ComputeError::precision_issue(
-            "division result has a repeating decimal expansion",
-        ));
+        return Err(ComputeError::repeating_decimal_expansion());
     }
 
     Ok(twos.max(fives))
