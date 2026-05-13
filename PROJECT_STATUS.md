@@ -319,7 +319,30 @@ Ownership note: changes stayed within `README.md`, `docs/**`, and `examples/**`.
 
 ## Next Workstreams
 
-No core workstreams remain. Run final integration audit and address any findings.
+No core workstreams remain.
+
+## Final Integration Audit
+
+Status: complete
+
+Final audit findings:
+
+- Corrected stale MCP `compute_expression` placeholder wording so it accurately says the MCP wrapper is not wired through, rather than claiming the Rust CLI lacks expression support.
+- Confirmed all listed workstreams are complete, reviewed at or above the required score, merged, and status-documented.
+- Confirmed working examples parse as JSON and runnable request examples execute successfully through the Rust CLI.
+
+Final audit checks:
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 113 `compute-core` tests and 17 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
+- `npm --prefix apps/mcp-server-ts run typecheck`: passed.
+- `npm --prefix apps/mcp-server-ts run build`: passed.
+- `npm --prefix apps/mcp-server-ts test`: passed with 24 MCP tests.
+- Example JSON parsing for all `examples/*.json`: passed.
+- CLI execution for arithmetic, expression, finance, verification, and expected-value generation request examples: passed.
+- `git diff --check`: passed.
 
 ## Coordination Notes
 
