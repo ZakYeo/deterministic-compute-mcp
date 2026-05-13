@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.deterministic-compute.dev/compute-response.schema.json",
+  "title": "ComputeResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "version"],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "result": {
+      "description": "Operation-specific deterministic result."
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": []
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "error": {
+      "type": "object"
+    },
+    "version": {
+      "type": "string"
+    }
+  }
+}

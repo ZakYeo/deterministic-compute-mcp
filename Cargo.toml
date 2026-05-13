@@ -1,0 +1,20 @@
+[workspace]
+members = [
+  "crates/compute-core",
+  "crates/compute-cli",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/placeholder/deterministic-compute-mcp"
+rust-version = "1.76"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

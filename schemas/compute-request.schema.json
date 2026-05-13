@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.deterministic-compute.dev/compute-request.schema.json",
+  "title": "ComputeRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "input"],
+  "properties": {
+    "operation": {
+      "type": "string",
+      "description": "Stable operation identifier, such as expression.evaluate."
+    },
+    "input": {
+      "type": "object",
+      "description": "Operation-specific input payload."
+    },
+    "precision": {
+      "type": "object",
+      "description": "Optional precision and rounding policy."
+    },
+    "trace": {
+      "type": "boolean",
+      "description": "Whether the caller requests proof or step metadata.",
+      "default": false
+    }
+  }
+}

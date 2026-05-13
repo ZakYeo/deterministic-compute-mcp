@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "result": {
+    "value": "4",
+    "type": "integer"
+  },
+  "diagnostics": [],
+  "trace": [
+    {
+      "step": "evaluate",
+      "detail": "2 + 2 = 4"
+    }
+  ],
+  "version": "0.1.0"
+}

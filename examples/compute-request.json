@@ -1,0 +1,11 @@
+{
+  "operation": "expression.evaluate",
+  "input": {
+    "expression": "2 + 2"
+  },
+  "precision": {
+    "decimalPlaces": 0,
+    "rounding": "exact"
+  },
+  "trace": true
+}
