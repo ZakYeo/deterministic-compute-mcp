@@ -15,6 +15,7 @@ pub mod expression;
 pub mod finance;
 mod precision;
 pub mod units;
+pub mod verification;
 
 use precision::MAX_DECIMAL_SCALE;
 
@@ -640,6 +641,15 @@ struct CagrInput {
     periods: u32,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VerificationInput {
+    expected: NumericValue,
+    actual: NumericValue,
+    #[serde(default)]
+    tolerance: Option<verification::Tolerance>,
+}
+
 /// Evaluates a generic compute request through the core operation dispatcher.
 pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
     let precision = request.precision.unwrap_or_default();
@@ -684,11 +694,12 @@ pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
             evaluate_margin_markup_request(request.input, precision, request.trace)
         }
         "finance.cagr" => evaluate_cagr_request(request.input, precision, request.trace),
+        "verification.compare" => evaluate_verification_request(request.input, request.trace),
         operation => ComputeResponse::failure(
             ComputeError {
                 code: ErrorCode::InvalidInput,
                 message: format!("unsupported operation: {operation}"),
-                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, and finance.cagr".to_owned()),
+                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, finance.cagr, and verification.compare".to_owned()),
             },
             None,
         ),
@@ -929,6 +940,50 @@ fn evaluate_cagr_request(
     )
     .map(finance_calculation_response)
     .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_verification_request(input: Value, include_trace: bool) -> ComputeResponse {
+    let input = match serde_json::from_value::<VerificationInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid verification input", error),
+                None,
+            )
+        }
+    };
+    let expected = match input.expected.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let actual = match input.actual.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    verification::compare(expected, actual, input.tolerance, include_trace)
+        .map(verification_response)
+        .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn verification_response(result: verification::VerificationResult) -> ComputeResponse {
+    let difference = result.difference.clone();
+    let details = serde_json::to_value(&result.details).ok();
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value: difference.clone(),
+            metadata: ResultMetadata {
+                engine_version: result.metadata.engine_version,
+                numeric_kind: numeric_value_kind(&difference),
+                precision: PrecisionPolicy::default(),
+                deterministic: result.metadata.deterministic,
+                assumptions: result.metadata.assumptions,
+            },
+            details,
+        },
+        (!result.trace.is_empty()).then_some(result.trace),
+    )
 }
 
 fn finance_calculation_response(result: finance::FinanceCalculationResult) -> ComputeResponse {
@@ -1501,6 +1556,29 @@ mod tests {
 
         assert_eq!(failure_json["ok"], false);
         assert_eq!(failure_json["error"]["code"], "division-by-zero");
+        Ok(())
+    }
+
+    #[test]
+    fn evaluates_verification_request_through_generic_dispatch() -> serde_json::Result<()> {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "verification.compare".to_owned(),
+            input: json!({
+                "expected": {"kind": "decimal", "value": "1.20", "scale": 2},
+                "actual": {"kind": "decimal", "value": "1.2", "scale": 1}
+            }),
+            precision: None,
+            trace: false,
+        });
+        let response_json = serde_json::to_value(response)?;
+
+        assert_eq!(response_json["ok"], true);
+        assert_eq!(response_json["result"]["details"]["status"], "exact-match");
+        assert_eq!(response_json["result"]["details"]["passed"], true);
+        assert_eq!(
+            response_json["result"]["value"],
+            json!({"kind": "decimal", "value": "0", "scale": 0})
+        );
         Ok(())
     }
 

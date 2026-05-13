@@ -64,6 +64,15 @@ export const numericValueSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
+function isNegativeNumericValue(value: z.infer<typeof numericValueSchema>): boolean {
+  return value.value.trim().startsWith("-");
+}
+
+const nonNegativeNumericValueSchema = numericValueSchema.refine(
+  (value) => !isNegativeNumericValue(value),
+  "numeric value must be greater than or equal to zero",
+);
+
 export const arithmeticToolInputSchema = z
   .object({
     operation: z
@@ -85,6 +94,37 @@ export const expressionToolInputSchema = z
     expression: z.string().min(1),
     precision: precisionPolicySchema.optional(),
     trace: z.boolean().default(false),
+  })
+  .strict();
+
+export const verificationToleranceSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("absolute"),
+      value: nonNegativeNumericValueSchema.describe(
+        "Non-negative absolute tolerance.",
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("relative"),
+      value: nonNegativeNumericValueSchema.describe(
+        "Non-negative decimal ratio applied to abs(expected).",
+      ),
+    })
+    .strict(),
+]);
+
+export const verificationToolInputSchema = z
+  .object({
+    expected: numericValueSchema,
+    actual: numericValueSchema,
+    tolerance: verificationToleranceSchema.optional(),
+    trace: z
+      .boolean()
+      .default(false)
+      .describe("Whether to request deterministic trace metadata."),
   })
   .strict();
 
@@ -162,3 +202,4 @@ export const financeToolInputSchema = z.discriminatedUnion("operation", [
 export type ArithmeticToolInput = z.infer<typeof arithmeticToolInputSchema>;
 export type ExpressionToolInput = z.infer<typeof expressionToolInputSchema>;
 export type FinanceToolInput = z.infer<typeof financeToolInputSchema>;
+export type VerificationToolInput = z.infer<typeof verificationToolInputSchema>;

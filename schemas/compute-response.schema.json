@@ -10,26 +10,288 @@
       "type": "boolean"
     },
     "result": {
-      "description": "Operation-specific deterministic result. Finance responses use value as the primary numeric output and may include machine-readable details such as loan summary totals or markup."
+      "$ref": "#/$defs/ComputeResult",
+      "description": "Operation-specific deterministic result. For verification.compare, value is the absolute difference and details carries comparison metadata."
     },
     "diagnostics": {
       "type": "array",
       "items": {
-        "type": "object"
+        "$ref": "#/$defs/Diagnostic"
       },
       "default": []
     },
     "trace": {
       "type": "array",
       "items": {
-        "type": "object"
+        "$ref": "#/$defs/TraceStep"
       }
     },
     "error": {
-      "type": "object"
+      "$ref": "#/$defs/ComputeError"
     },
     "version": {
       "type": "string"
+    }
+  },
+  "$defs": {
+    "NumericValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[+-]?\\d+$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value", "scale"],
+          "properties": {
+            "kind": {
+              "const": "decimal"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$"
+            },
+            "scale": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 38
+            }
+          }
+        }
+      ]
+    },
+    "PrecisionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decimalPlaces": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 38
+        },
+        "rounding": {
+          "enum": ["exact", "truncate", "half-away-from-zero"],
+          "default": "exact"
+        }
+      }
+    },
+    "ResultMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engineVersion",
+        "numericKind",
+        "precision",
+        "deterministic"
+      ],
+      "properties": {
+        "engineVersion": {
+          "type": "string"
+        },
+        "numericKind": {
+          "enum": ["integer", "decimal"]
+        },
+        "precision": {
+          "$ref": "#/$defs/PrecisionPolicy"
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ComputeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "value", "metadata"],
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ResultMetadata"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerificationDetails"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "verification.compare"
+              }
+            },
+            "required": ["operation"]
+          },
+          "then": {
+            "required": ["details"],
+            "properties": {
+              "details": {
+                "$ref": "#/$defs/VerificationDetails"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ComparisonStatus": {
+      "enum": [
+        "exact-match",
+        "exact-mismatch",
+        "within-tolerance",
+        "outside-tolerance"
+      ]
+    },
+    "ComparisonMode": {
+      "enum": ["exact", "absolute-tolerance", "relative-tolerance"]
+    },
+    "ToleranceKind": {
+      "enum": ["absolute", "relative"]
+    },
+    "ToleranceDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "allowedDifference"],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ToleranceKind"
+        },
+        "value": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "allowedDifference": {
+          "$ref": "#/$defs/NumericValue"
+        }
+      }
+    },
+    "VerificationDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "passed",
+        "mode",
+        "expected",
+        "actual",
+        "difference"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/ComparisonStatus"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "mode": {
+          "$ref": "#/$defs/ComparisonMode"
+        },
+        "expected": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "actual": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "difference": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "tolerance": {
+          "$ref": "#/$defs/ToleranceDetails"
+        }
+      }
+    },
+    "TraceStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step", "operation", "inputs", "note"],
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "operation": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NumericValue"
+          }
+        },
+        "output": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "Diagnostic": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": {
+          "enum": ["info", "warning"]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "ComputeError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid-input",
+            "division-by-zero",
+            "precision-issue",
+            "overflow"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
     }
   }
 }

@@ -8,20 +8,161 @@
   "properties": {
     "operation": {
       "type": "string",
-      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, or finance.cagr. CAGR supports only exact roots representable at the requested decimalPlaces."
+      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, finance.cagr, or verification.compare. CAGR supports only exact roots representable at the requested decimalPlaces."
     },
     "input": {
       "type": "object",
       "description": "Operation-specific input payload."
     },
     "precision": {
-      "type": "object",
+      "$ref": "#/$defs/PrecisionPolicy",
       "description": "Optional precision and rounding policy."
     },
     "trace": {
       "type": "boolean",
       "description": "Whether the caller requests proof or step metadata.",
       "default": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "verification.compare"
+          }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "properties": {
+          "precision": {
+            "description": "Ignored for verification.compare; comparisons use exact numeric values and explicit tolerance."
+          },
+          "input": {
+            "$ref": "#/$defs/VerificationCompareInput"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "NumericValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "integer"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[+-]?\\d+$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value", "scale"],
+          "properties": {
+            "kind": {
+              "const": "decimal"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$"
+            },
+            "scale": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 38,
+              "description": "Number of fractional decimal digits serialized in value."
+            }
+          }
+        }
+      ]
+    },
+    "NonNegativeNumericValue": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/NumericValue"
+        },
+        {
+          "not": {
+            "properties": {
+              "value": {
+                "pattern": "^-"
+              }
+            },
+            "required": ["value"]
+          }
+        }
+      ]
+    },
+    "VerificationTolerance": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "absolute"
+            },
+            "value": {
+              "$ref": "#/$defs/NonNegativeNumericValue"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "relative"
+            },
+            "value": {
+              "$ref": "#/$defs/NonNegativeNumericValue",
+              "description": "Decimal ratio applied to abs(expected)."
+            }
+          }
+        }
+      ]
+    },
+    "VerificationCompareInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "actual"],
+      "properties": {
+        "expected": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "actual": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "tolerance": {
+          "$ref": "#/$defs/VerificationTolerance"
+        }
+      }
+    },
+    "PrecisionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decimalPlaces": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 38
+        },
+        "rounding": {
+          "enum": ["exact", "truncate", "half-away-from-zero"],
+          "default": "exact"
+        }
+      }
     }
   }
 }
