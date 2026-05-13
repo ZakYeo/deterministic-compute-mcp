@@ -56,9 +56,40 @@ Ownership note: `Cargo.lock` changed outside `crates/compute-core/**` because `c
 - `cargo test --workspace`: passed with 30 `compute-core` tests.
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed.
 
+## Rust CLI Status
+
+Branch: `agent/rust-cli`
+
+Status: complete and merged
+
+Review history:
+
+- Review: 91/100, passed with minor requested coverage improvements.
+- Added file-input and subtract-operation regression tests before merge.
+- Updated `--version` to report the CLI package version.
+
+The Rust CLI now includes:
+
+- JSON compute request input from stdin or a single request file.
+- JSON `ComputeResponse` output to stdout.
+- Arithmetic dispatch for add, subtract, multiply, and divide.
+- Operand parsing through `compute-core` JSON-safe numeric types.
+- Precision and rounding policy pass-through to `compute-core`.
+- Structured compute errors as JSON responses.
+- Runtime/CLI errors reported as nonzero exit failures.
+- Minimal help and version commands.
+
+Ownership note: `Cargo.lock` changed outside `crates/compute-cli/**` because `compute-cli` added direct `serde` and `serde_json` dependencies.
+
+## Rust CLI Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 13 `compute-cli` tests and 30 `compute-core` tests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
+
 ## Next Workstreams
 
-- `agent/rust-cli`: expose compute-core through a stable JSON CLI.
 - `agent/typescript-mcp-server`: implement MCP SDK wiring, tool registration, schema validation, and CLI process integration.
 - `agent/expression-engine`: add safe expression parsing, AST evaluation, and proof traces.
 - `agent/units`: add unit conversion and dimensional analysis.
