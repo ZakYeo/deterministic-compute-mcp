@@ -25,6 +25,7 @@ Supported operations:
   finance.margin-markup
   finance.cagr
   verification.compare
+  test-generation.generate-expected-values
 ";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -236,6 +237,58 @@ mod tests {
             response["result"]["value"],
             json!({"kind": "integer", "value": "42"})
         );
+        Ok(())
+    }
+
+    #[test]
+    fn generates_expected_values() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "test-generation.generate-expected-values",
+            "input": {
+                "cases": [
+                    {
+                        "id": "addition",
+                        "operation": "arithmetic.add",
+                        "input": {
+                            "left": {"kind": "integer", "value": "20"},
+                            "right": {"kind": "integer", "value": "22"}
+                        }
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(
+            response["result"]["details"]["cases"][0]["response"]["result"]["value"],
+            json!({"kind": "integer", "value": "42"})
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_recursive_expected_value_generation_through_cli_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "test-generation.generate-expected-values",
+            "input": {
+                "cases": [
+                    {
+                        "id": "recursive",
+                        "operation": "test-generation.generate-expected-values",
+                        "input": {"cases": []}
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], false);
+        assert_eq!(response["error"]["code"], "invalid-input");
         Ok(())
     }
 

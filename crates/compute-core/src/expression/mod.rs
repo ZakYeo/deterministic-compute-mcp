@@ -443,6 +443,7 @@ impl Evaluator {
             inputs,
             output: Some(output),
             note: note.into(),
+            metadata: None,
         });
         self.next_step += 1;
     }

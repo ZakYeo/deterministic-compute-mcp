@@ -8,7 +8,7 @@
   "properties": {
     "operation": {
       "type": "string",
-      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, finance.cagr, or verification.compare. CAGR supports only exact roots representable at the requested decimalPlaces."
+      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, finance.cagr, verification.compare, or test-generation.generate-expected-values. CAGR supports only exact roots representable at the requested decimalPlaces."
     },
     "input": {
       "type": "object",
@@ -41,6 +41,26 @@
           },
           "input": {
             "$ref": "#/$defs/VerificationCompareInput"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "test-generation.generate-expected-values"
+          }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "properties": {
+          "precision": {
+            "description": "Ignored for test-generation.generate-expected-values; each case may carry its own precision policy."
+          },
+          "input": {
+            "$ref": "#/$defs/GenerateExpectedValuesInput"
           }
         }
       }
@@ -146,6 +166,74 @@
         },
         "tolerance": {
           "$ref": "#/$defs/VerificationTolerance"
+        }
+      }
+    },
+    "ExpectedValueCaseSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "operation", "input"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Stable case identifier, limited to 128 UTF-8 bytes by the Rust implementation."
+        },
+        "operation": {
+          "enum": [
+            "arithmetic.add",
+            "arithmetic.subtract",
+            "arithmetic.multiply",
+            "arithmetic.divide",
+            "expression.evaluate",
+            "finance.simple-interest",
+            "finance.compound-interest",
+            "finance.loan-payment",
+            "finance.percentage-change",
+            "finance.margin-markup",
+            "finance.cagr",
+            "verification.compare"
+          ],
+          "description": "Supported compute operation to evaluate for this expected value. Recursive test-generation.generate-expected-values cases are rejected."
+        },
+        "input": {
+          "type": "object",
+          "description": "Operation-specific input payload for this case. Serialized JSON must not exceed 16384 bytes."
+        },
+        "precision": {
+          "$ref": "#/$defs/PrecisionPolicy"
+        },
+        "trace": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "GenerateExpectedValuesInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cases"],
+      "properties": {
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/ExpectedValueCaseSpec"
+          },
+          "description": "Cases evaluated in input order."
+        },
+        "failOnCaseError": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, any failing generated case fails the whole request."
+        },
+        "maxCases": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Optional caller-specified case limit no greater than 100."
         }
       }
     },

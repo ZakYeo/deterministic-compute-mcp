@@ -14,6 +14,7 @@ use std::str::FromStr;
 pub mod expression;
 pub mod finance;
 mod precision;
+pub mod test_generation;
 pub mod units;
 pub mod verification;
 
@@ -139,6 +140,26 @@ pub struct TraceStep {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<NumericValue>,
     pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<TraceMetadata>,
+}
+
+/// Optional machine-readable trace metadata for higher-level operations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluated_case_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failed_case_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_index: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_operation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub case_ok: Option<bool>,
 }
 
 /// Structured compute error.
@@ -582,6 +603,7 @@ pub fn compute_binary(
                     inputs: vec![left.into(), right.into()],
                     output: Some(value.into()),
                     note: "deterministic binary arithmetic".to_owned(),
+                    metadata: None,
                 }]
             });
             ComputeResponse::success(result, trace)
@@ -695,11 +717,14 @@ pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
         }
         "finance.cagr" => evaluate_cagr_request(request.input, precision, request.trace),
         "verification.compare" => evaluate_verification_request(request.input, request.trace),
+        "test-generation.generate-expected-values" => {
+            evaluate_test_generation_request(request.input, request.trace)
+        }
         operation => ComputeResponse::failure(
             ComputeError {
                 code: ErrorCode::InvalidInput,
                 message: format!("unsupported operation: {operation}"),
-                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, finance.cagr, and verification.compare".to_owned()),
+                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, finance.cagr, verification.compare, and test-generation.generate-expected-values".to_owned()),
             },
             None,
         ),
@@ -966,6 +991,21 @@ fn evaluate_verification_request(input: Value, include_trace: bool) -> ComputeRe
         .unwrap_or_else(|error| ComputeResponse::failure(error, None))
 }
 
+fn evaluate_test_generation_request(input: Value, include_trace: bool) -> ComputeResponse {
+    let input =
+        match serde_json::from_value::<test_generation::GenerateExpectedValuesRequest>(input) {
+            Ok(input) => input,
+            Err(error) => {
+                return ComputeResponse::failure(
+                    invalid_request_input("invalid test generation input", error),
+                    None,
+                )
+            }
+        };
+
+    test_generation::generate_expected_values(input, include_trace)
+}
+
 fn verification_response(result: verification::VerificationResult) -> ComputeResponse {
     let difference = result.difference.clone();
     let details = serde_json::to_value(&result.details).ok();
@@ -1052,6 +1092,7 @@ fn finance_trace_to_core_trace(trace: Vec<finance::FinanceTraceStep>) -> Option<
                 inputs: step.inputs,
                 output: step.output,
                 note: step.note,
+                metadata: None,
             })
             .collect()
     })
@@ -2041,6 +2082,45 @@ mod tests {
             response["result"]["value"],
             json!({"kind": "integer", "value": "14"})
         );
+        Ok(())
+    }
+
+    #[test]
+    fn dispatches_test_generation_request() -> serde_json::Result<()> {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "test-generation.generate-expected-values".to_owned(),
+            input: json!({
+                "cases": [
+                    {
+                        "id": "addition",
+                        "operation": "arithmetic.add",
+                        "input": {
+                            "left": {"kind": "integer", "value": "19"},
+                            "right": {"kind": "integer", "value": "23"}
+                        }
+                    }
+                ]
+            }),
+            precision: None,
+            trace: true,
+        });
+        let response = serde_json::to_value(response)?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(
+            response["result"]["operation"],
+            "test-generation.generate-expected-values"
+        );
+        assert_eq!(
+            response["result"]["details"]["cases"][0]["response"]["result"]["value"],
+            json!({"kind": "integer", "value": "42"})
+        );
+        assert_eq!(
+            response["trace"][1]["operation"],
+            "test-generation.generate-expected-values"
+        );
+        assert_eq!(response["trace"][0]["metadata"]["caseId"], "addition");
+        assert_eq!(response["trace"][1]["metadata"]["evaluatedCaseCount"], 1);
         Ok(())
     }
 

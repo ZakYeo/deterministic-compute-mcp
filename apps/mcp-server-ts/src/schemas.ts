@@ -1,5 +1,8 @@
 import * as z from "zod/v4";
 
+const MAX_EXPECTED_VALUE_CASE_ID_BYTES = 128;
+const MAX_EXPECTED_VALUE_CASE_INPUT_BYTES = 16 * 1024;
+
 export const roundingModeSchema = z.enum([
   "exact",
   "truncate",
@@ -128,6 +131,79 @@ export const verificationToolInputSchema = z
   })
   .strict();
 
+export const expectedValueCaseSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(
+        (value) => Buffer.byteLength(value, "utf8") <= MAX_EXPECTED_VALUE_CASE_ID_BYTES,
+        `case id must be at most ${MAX_EXPECTED_VALUE_CASE_ID_BYTES} UTF-8 bytes`,
+      ),
+    operation: z
+      .enum([
+        "arithmetic.add",
+        "arithmetic.subtract",
+        "arithmetic.multiply",
+        "arithmetic.divide",
+        "expression.evaluate",
+        "finance.simple-interest",
+        "finance.compound-interest",
+        "finance.loan-payment",
+        "finance.percentage-change",
+        "finance.margin-markup",
+        "finance.cagr",
+        "verification.compare",
+      ])
+      .describe("Supported compute operation used to generate this expected value."),
+    input: z
+      .record(z.string(), z.unknown())
+      .refine(
+        (value) =>
+          Buffer.byteLength(JSON.stringify(value), "utf8") <=
+          MAX_EXPECTED_VALUE_CASE_INPUT_BYTES,
+        `case input must serialize to at most ${MAX_EXPECTED_VALUE_CASE_INPUT_BYTES} bytes`,
+      ),
+    precision: precisionPolicySchema.optional(),
+    trace: z.boolean().default(false),
+  })
+  .strict();
+
+export const testGenerationToolInputSchema = z
+  .object({
+    cases: z
+      .array(expectedValueCaseSchema)
+      .min(1)
+      .max(100)
+      .describe("Deterministic cases evaluated in input order."),
+    failOnCaseError: z
+      .boolean()
+      .default(false)
+      .describe("When true, any failing generated case fails the whole request."),
+    maxCases: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Optional caller-specified limit no greater than 100."),
+    trace: z
+      .boolean()
+      .default(false)
+      .describe("Whether to request deterministic generator trace metadata."),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.maxCases !== undefined && value.cases.length > value.maxCases) {
+      context.addIssue({
+        code: "custom",
+        message: "case count must not exceed maxCases",
+        path: ["cases"],
+      });
+    }
+  });
+
 const financeCommonFields = {
   precision: precisionPolicySchema.optional(),
   trace: z
@@ -202,4 +278,7 @@ export const financeToolInputSchema = z.discriminatedUnion("operation", [
 export type ArithmeticToolInput = z.infer<typeof arithmeticToolInputSchema>;
 export type ExpressionToolInput = z.infer<typeof expressionToolInputSchema>;
 export type FinanceToolInput = z.infer<typeof financeToolInputSchema>;
+export type TestGenerationToolInput = z.infer<
+  typeof testGenerationToolInputSchema
+>;
 export type VerificationToolInput = z.infer<typeof verificationToolInputSchema>;

@@ -11,7 +11,7 @@
     },
     "result": {
       "$ref": "#/$defs/ComputeResult",
-      "description": "Operation-specific deterministic result. For verification.compare, value is the absolute difference and details carries comparison metadata."
+      "description": "Operation-specific deterministic result. For verification.compare, value is the absolute difference and details carries comparison metadata. For test-generation.generate-expected-values, value is the generated case count and details carries generated cases."
     },
     "diagnostics": {
       "type": "array",
@@ -136,6 +136,9 @@
               "$ref": "#/$defs/VerificationDetails"
             },
             {
+              "$ref": "#/$defs/GeneratedExpectedValuesDetails"
+            },
+            {
               "type": "object"
             }
           ]
@@ -156,6 +159,24 @@
             "properties": {
               "details": {
                 "$ref": "#/$defs/VerificationDetails"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "test-generation.generate-expected-values"
+              }
+            },
+            "required": ["operation"]
+          },
+          "then": {
+            "required": ["details"],
+            "properties": {
+              "details": {
+                "$ref": "#/$defs/GeneratedExpectedValuesDetails"
               }
             }
           }
@@ -227,6 +248,48 @@
         }
       }
     },
+    "GeneratedExpectedValueCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "request", "response"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "request": {
+          "type": "object",
+          "description": "The compute request evaluated for this generated case."
+        },
+        "response": {
+          "description": "The deterministic compute response for this generated case."
+        }
+      }
+    },
+    "GeneratedExpectedValuesDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseCount", "failedCaseCount", "cases"],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "failedCaseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/GeneratedExpectedValueCase"
+          }
+        }
+      }
+    },
     "TraceStep": {
       "type": "object",
       "additionalProperties": false,
@@ -250,6 +313,40 @@
         },
         "note": {
           "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/TraceMetadata"
+        }
+      }
+    },
+    "TraceMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "evaluatedCaseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "failedCaseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "caseIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99
+        },
+        "caseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "caseOperation": {
+          "type": "string"
+        },
+        "caseOk": {
+          "type": "boolean"
         }
       }
     },
@@ -289,7 +386,8 @@
           "type": "string"
         },
         "detail": {
-          "type": "string"
+          "type": "string",
+          "description": "Optional machine-readable detail serialized as JSON when an operation has structured failure context, including fail-fast test generation case failures."
         }
       }
     }

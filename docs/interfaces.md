@@ -1,10 +1,10 @@
-# Planned Interfaces
+# Interfaces
 
-The interfaces in this document are directional. They are not yet implemented.
+This document describes the current generic compute request/response contract and notes planned domains where they are still pending.
 
 ## Compute Request
 
-Planned requests should include:
+Requests include:
 
 - `operation`: stable operation identifier.
 - `input`: operation-specific payload.
@@ -13,7 +13,7 @@ Planned requests should include:
 
 ## Compute Response
 
-Planned responses should include:
+Responses include:
 
 - `ok`: success flag.
 - `result`: deterministic operation result.
@@ -23,7 +23,7 @@ Planned responses should include:
 
 ## MCP Tools
 
-Initial MCP tools are expected to map to stable compute domains:
+MCP tools map to stable compute domains:
 
 - `compute_expression`
 - `convert_units`
@@ -31,7 +31,7 @@ Initial MCP tools are expected to map to stable compute domains:
 - `verify_result`
 - `generate_expected_values`
 
-Tool names and schemas should be finalized by the TypeScript MCP server worker.
+Some planned domains may still be absent from the TypeScript MCP wrapper until their core implementation lands.
 
 ## Finance Operations
 
@@ -55,3 +55,20 @@ Implemented generic verification operations include:
 - `verification.compare`
 
 `verification.compare` accepts `expected`, `actual`, and optional `tolerance`. Without tolerance it performs scale-normalized exact numeric equality. With tolerance it supports `absolute` tolerance and `relative` tolerance, where relative tolerance is applied to `abs(expected)`. The generic result `value` is the absolute difference; structured comparison status and tolerance metadata are emitted in `result.details`.
+
+## Test Generation Operations
+
+Implemented generic test generation operations include:
+
+- `test-generation.generate-expected-values`
+
+`test-generation.generate-expected-values` accepts a bounded `cases` array of explicit compute requests. Cases are evaluated in input order through the same core dispatcher used by CLI and MCP calls, so expected values reuse arithmetic, expression, finance, and verification behavior instead of duplicating formulas. The operation does not generate random inputs.
+
+Bounds:
+
+- `cases`: 1 to 100 cases.
+- `maxCases`: optional caller limit from 1 to 100.
+- `case.id`: non-empty and at most 128 UTF-8 bytes.
+- `case.input`: serialized JSON must be at most 16384 bytes.
+
+The generic result `value` is the generated case count; `result.details.cases` contains each case id, normalized request, and deterministic compute response. Generator trace metadata includes evaluated and failed case counts plus per-case id, operation, index, and success status without duplicating full nested responses. With `failOnCaseError: true`, the top-level error `detail` is a JSON object string containing `caseId`, `caseIndex`, `operation`, nested `error.code`, nested `error.message`, the nested response, and the number of cases generated before the failure.
