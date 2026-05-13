@@ -291,10 +291,10 @@ Registered tools:
   "ok": false,
   "error": {
     "code": "not-implemented",
-    "message": "expression.evaluate is not implemented by the current Rust CLI"
+    "message": "expression.evaluate is not wired through the current MCP wrapper"
   },
   "version": "mcp-wrapper"
 }
 ```
 
-That message is stale relative to the Rust CLI; the integration boundary is that the wrapper has not yet been updated to invoke the CLI for expressions.
+The integration boundary is that the wrapper has not yet been updated to invoke the CLI for expressions.

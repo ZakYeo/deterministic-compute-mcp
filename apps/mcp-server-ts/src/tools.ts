@@ -140,7 +140,7 @@ export function buildExpressionToolResult(
       ok: false,
       error: {
         code: "not-implemented",
-        message: "expression.evaluate is not implemented by the current Rust CLI",
+        message: "expression.evaluate is not wired through the current MCP wrapper",
       },
       version: "mcp-wrapper",
     },
