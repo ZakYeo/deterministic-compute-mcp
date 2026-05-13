@@ -5,8 +5,10 @@ import test from "node:test";
 
 import {
   buildArithmeticRequest,
+  buildExpressionRequest,
   buildFinanceRequest,
   buildTestGenerationRequest,
+  buildUnitConversionRequest,
   buildVerificationRequest,
   invokeComputeCli,
   resolveCliCommand,
@@ -15,8 +17,10 @@ import {
 } from "./cli.js";
 import {
   arithmeticToolInputSchema,
+  expressionToolInputSchema,
   financeToolInputSchema,
   testGenerationToolInputSchema,
+  unitConversionToolInputSchema,
   verificationToolInputSchema,
 } from "./schemas.js";
 import {
@@ -24,6 +28,7 @@ import {
   buildFinanceToolResult,
   buildTestGenerationToolResult,
   buildToolResult,
+  buildUnitConversionToolResult,
   buildVerificationToolResult,
   type ToolPayload,
 } from "./tools.js";
@@ -128,6 +133,87 @@ test("buildFinanceRequest maps MCP input to compute CLI request", () => {
   });
 });
 
+test("finance schema accepts VAT inputs", () => {
+  const parsed = financeToolInputSchema.parse({
+    operation: "vat",
+    netAmount: { kind: "integer", value: "100" },
+    vatRate: { kind: "decimal", value: "0.20", scale: 2 },
+    precision: { decimalPlaces: 2, rounding: "exact" },
+  });
+
+  assert.equal(parsed.operation, "vat");
+  assert.throws(() =>
+    financeToolInputSchema.parse({
+      operation: "vat",
+      netAmount: { kind: "integer", value: "-1" },
+      vatRate: { kind: "decimal", value: "0.20", scale: 2 },
+    }),
+  );
+});
+
+test("buildFinanceRequest maps VAT input to compute CLI request", () => {
+  const request = buildFinanceRequest({
+    operation: "vat",
+    netAmount: { kind: "integer", value: "100" },
+    vatRate: { kind: "decimal", value: "0.20", scale: 2 },
+    precision: { decimalPlaces: 2, rounding: "exact" },
+    trace: false,
+  });
+
+  assert.deepEqual(request, {
+    operation: "finance.vat",
+    input: {
+      netAmount: { kind: "integer", value: "100" },
+      vatRate: { kind: "decimal", value: "0.20", scale: 2 },
+    },
+    precision: { decimalPlaces: 2, rounding: "exact" },
+    trace: false,
+  });
+});
+
+test("unit conversion schema and request builder map MCP input", () => {
+  const parsed = unitConversionToolInputSchema.parse({
+    value: { kind: "integer", value: "100" },
+    sourceUnit: "cm",
+    targetUnit: "m",
+    precision: { decimalPlaces: 2, rounding: "exact" },
+    trace: true,
+  });
+  const request = buildUnitConversionRequest(parsed);
+
+  assert.deepEqual(request, {
+    operation: "units.convert",
+    input: {
+      value: { kind: "integer", value: "100" },
+      sourceUnit: "cm",
+      targetUnit: "m",
+    },
+    precision: { decimalPlaces: 2, rounding: "exact" },
+    trace: true,
+  });
+});
+
+test("unit conversion schema rejects overlong unit identifiers", () => {
+  assert.throws(() =>
+    unitConversionToolInputSchema.parse({
+      value: { kind: "integer", value: "100" },
+      sourceUnit: "x".repeat(33),
+      targetUnit: "m",
+    }),
+  );
+});
+
+test("unit conversion schema applies a 32-character identifier bound", () => {
+  const thirtyTwoCharacters = "å".repeat(32);
+  const parsed = unitConversionToolInputSchema.parse({
+    value: { kind: "integer", value: "100" },
+    sourceUnit: thirtyTwoCharacters,
+    targetUnit: "m",
+  });
+
+  assert.equal(parsed.sourceUnit, thirtyTwoCharacters);
+});
+
 test("verification schema accepts exact and tolerance comparisons", () => {
   const exact = verificationToolInputSchema.parse({
     expected: { kind: "integer", value: "42" },
@@ -186,6 +272,16 @@ test("public JSON schemas define verification compare contract", () => {
   );
 
   assert.ok(requestSchema.$defs.NumericValue);
+  assert.ok(requestSchema.$defs.UnitConversionInput);
+  assert.ok(requestSchema.$defs.VatInput);
+  assert.equal(
+    requestSchema.$defs.UnitConversionInput.properties.sourceUnit.maxLength,
+    32,
+  );
+  assert.equal(
+    requestSchema.$defs.UnitConversionInput.properties.targetUnit.maxLength,
+    32,
+  );
   assert.ok(requestSchema.$defs.VerificationCompareInput);
   assert.ok(requestSchema.$defs.VerificationTolerance);
   assert.equal(
@@ -193,6 +289,12 @@ test("public JSON schemas define verification compare contract", () => {
     "#/$defs/VerificationTolerance",
   );
   assert.ok(responseSchema.$defs.VerificationDetails);
+  assert.ok(responseSchema.$defs.UnitConversionDetails);
+  assert.ok(responseSchema.$defs.VatDetails);
+  assert.equal(
+    responseSchema.$defs.VatDetails.properties.grossAmount.$ref,
+    "#/$defs/NumericValue",
+  );
   assert.deepEqual(responseSchema.$defs.ComparisonStatus.enum, [
     "exact-match",
     "exact-mismatch",
@@ -244,9 +346,11 @@ test("public JSON schemas define expected-value generation contract", () => {
       "finance.simple-interest",
       "finance.compound-interest",
       "finance.loan-payment",
+      "finance.vat",
       "finance.percentage-change",
       "finance.margin-markup",
       "finance.cagr",
+      "units.convert",
       "verification.compare",
     ],
   );
@@ -419,16 +523,143 @@ test("buildToolResult returns matching structuredContent and JSON text content",
   assert.deepEqual(JSON.parse(result.content[0]?.type === "text" ? result.content[0].text : ""), payload);
 });
 
-test("buildExpressionToolResult returns a structured not-implemented response", () => {
-  const result = buildExpressionToolResult({
+test("buildExpressionRequest maps MCP input to compute CLI request", () => {
+  assert.equal(
+    expressionToolInputSchema.parse({ expression: "1 + 2" }).trace,
+    false,
+  );
+
+  const request = buildExpressionRequest({
     expression: "1 + 2",
+    precision: { decimalPlaces: 0, rounding: "exact" },
     trace: true,
   });
+
+  assert.deepEqual(request, {
+    operation: "expression.evaluate",
+    input: {
+      expression: "1 + 2",
+    },
+    precision: { decimalPlaces: 0, rounding: "exact" },
+    trace: true,
+  });
+});
+
+test("new MCP tool handlers invoke the real compute CLI", async () => {
+  const commandConfig = resolveCliCommand();
+  const expression = (await buildExpressionToolResult(
+    { expression: "(2 + 3) * 4", trace: false },
+    runProcess,
+    commandConfig,
+  )).structuredContent as ToolPayload;
+  const units = (await buildUnitConversionToolResult(
+    {
+      value: { kind: "integer", value: "100" },
+      sourceUnit: "cm",
+      targetUnit: "m",
+      precision: { decimalPlaces: 2, rounding: "exact" },
+      trace: false,
+    },
+    runProcess,
+    commandConfig,
+  )).structuredContent as ToolPayload;
+  const vat = (await buildFinanceToolResult(
+    {
+      operation: "vat",
+      netAmount: { kind: "integer", value: "100" },
+      vatRate: { kind: "decimal", value: "0.20", scale: 2 },
+      precision: { decimalPlaces: 2, rounding: "exact" },
+      trace: false,
+    },
+    runProcess,
+    commandConfig,
+  )).structuredContent as ToolPayload;
+  const expressionResult = (expression.response as { result?: { value?: unknown } })
+    .result;
+  const unitsResult = (units.response as { result?: { value?: unknown } }).result;
+  const vatResult = (vat.response as { result?: { value?: unknown } }).result;
+
+  assert.equal(expression.response.ok, true);
+  assert.deepEqual(expressionResult?.value, {
+    kind: "integer",
+    value: "20",
+  });
+  assert.equal(units.response.ok, true);
+  assert.deepEqual(unitsResult?.value, {
+    kind: "decimal",
+    value: "1.00",
+    scale: 2,
+  });
+  assert.equal(vat.response.ok, true);
+  assert.deepEqual(vatResult?.value, {
+    kind: "decimal",
+    value: "120.00",
+    scale: 2,
+  });
+});
+
+test("buildExpressionToolResult invokes compute CLI with expression request", async () => {
+  let capturedInput = "";
+  const runner: ProcessRunner = async (_command, _args, input) => {
+    capturedInput = input;
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        result: { operation: JSON.parse(input).operation },
+        version: "0.1.0",
+      }),
+      stderr: "",
+    };
+  };
+
+  const result = await buildExpressionToolResult(
+    {
+      expression: "1 + 2",
+      trace: true,
+    },
+    runner,
+    { command: "compute-cli", args: [] },
+  );
   const structuredContent = result.structuredContent as ToolPayload;
 
   assert.equal(structuredContent.tool, "compute_expression");
-  assert.equal(structuredContent.response.ok, false);
-  assert.equal(structuredContent.response.error?.code, "not-implemented");
+  assert.equal(structuredContent.request.operation, "expression.evaluate");
+  assert.match(capturedInput, /"operation":"expression.evaluate"/);
+  assert.equal(structuredContent.response.ok, true);
+});
+
+test("buildUnitConversionToolResult invokes compute CLI with units request", async () => {
+  let capturedInput = "";
+  const runner: ProcessRunner = async (_command, _args, input) => {
+    capturedInput = input;
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        result: { operation: JSON.parse(input).operation },
+        version: "0.1.0",
+      }),
+      stderr: "",
+    };
+  };
+
+  const result = await buildUnitConversionToolResult(
+    {
+      value: { kind: "integer", value: "100" },
+      sourceUnit: "cm",
+      targetUnit: "m",
+      trace: false,
+    },
+    runner,
+    { command: "compute-cli", args: [] },
+  );
+  const structuredContent = result.structuredContent as ToolPayload;
+
+  assert.equal(structuredContent.tool, "convert_units");
+  assert.equal(structuredContent.request.operation, "units.convert");
+  assert.match(capturedInput, /"operation":"units.convert"/);
+  assert.equal(structuredContent.response.ok, true);
 });
 
 test("buildFinanceToolResult invokes compute CLI with finance request", async () => {
@@ -687,4 +918,15 @@ test("resolveCliCommand uses configurable command and JSON args", () => {
     command: "/bin/compute-cli",
     args: ["--flag"],
   });
+});
+
+test("example JSON files are valid", () => {
+  const examplesDir = path.join(process.cwd(), "../../examples");
+  for (const fileName of fs.readdirSync(examplesDir)) {
+    if (fileName.endsWith(".json")) {
+      assert.doesNotThrow(() =>
+        JSON.parse(fs.readFileSync(path.join(examplesDir, fileName), "utf8")),
+      );
+    }
+  }
 });

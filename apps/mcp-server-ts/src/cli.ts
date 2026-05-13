@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import type {
   ArithmeticToolInput,
+  ExpressionToolInput,
   FinanceToolInput,
   TestGenerationToolInput,
+  UnitConversionToolInput,
   VerificationToolInput,
 } from "./schemas.js";
 
@@ -14,7 +16,9 @@ export type ComputeRequest = {
   input: Record<string, unknown>;
   precision?:
     | ArithmeticToolInput["precision"]
+    | ExpressionToolInput["precision"]
     | FinanceToolInput["precision"]
+    | UnitConversionToolInput["precision"]
     | TestGenerationToolInput["cases"][number]["precision"];
   trace: boolean;
 };
@@ -101,6 +105,42 @@ export function buildFinanceRequest(input: FinanceToolInput): ComputeRequest {
 
   if (precision) {
     request.precision = precision;
+  }
+
+  return request;
+}
+
+export function buildExpressionRequest(input: ExpressionToolInput): ComputeRequest {
+  const request: ComputeRequest = {
+    operation: "expression.evaluate",
+    input: {
+      expression: input.expression,
+    },
+    trace: input.trace ?? false,
+  };
+
+  if (input.precision) {
+    request.precision = input.precision;
+  }
+
+  return request;
+}
+
+export function buildUnitConversionRequest(
+  input: UnitConversionToolInput,
+): ComputeRequest {
+  const request: ComputeRequest = {
+    operation: "units.convert",
+    input: {
+      value: input.value,
+      sourceUnit: input.sourceUnit,
+      targetUnit: input.targetUnit,
+    },
+    trace: input.trace ?? false,
+  };
+
+  if (input.precision) {
+    request.precision = input.precision;
   }
 
   return request;

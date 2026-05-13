@@ -26,7 +26,7 @@ Fields:
 - `precision`: optional decimal output policy for operations that produce numeric values.
 - `trace`: optional deterministic step metadata.
 
-The public JSON Schema currently validates the generic envelope and fully specializes verification and expected-value generation payloads. Arithmetic, expression, and finance payloads are documented below and validated by the Rust and MCP runtime layers.
+The public JSON Schema currently validates the generic envelope and fully specializes units, VAT, verification, and expected-value generation payloads. Arithmetic, expression, and other finance payloads are documented below and validated by the Rust and MCP runtime layers.
 
 ## Numeric Values
 
@@ -125,7 +125,25 @@ Input:
 }
 ```
 
-The Rust CLI supports numeric literals, `+`, `-`, `*`, `/`, parentheses, and unary minus. It applies the same deterministic arithmetic and final precision policy as the core. The MCP `compute_expression` tool is not yet wired to the CLI and returns a wrapper-level not-implemented response.
+The Rust CLI and MCP `compute_expression` tool support numeric literals, `+`, `-`, `*`, `/`, parentheses, and unary minus. They apply the same deterministic arithmetic and final precision policy as the core.
+
+## Unit Conversion Operation
+
+Operation:
+
+- `units.convert`
+
+Input:
+
+```json
+{
+  "value": { "kind": "integer", "value": "100" },
+  "sourceUnit": "cm",
+  "targetUnit": "m"
+}
+```
+
+Supported dimensions are length, mass, time, and temperature. Unit identifiers are bounded to 32 characters in public schemas and core request validation. Linear conversions use reduced rational factors. Temperature conversions use a single affine transform and then apply the requested final precision. The generic result `value` is the converted value; `result.details` carries `dimension`, units, conversion kind, factors, scale, and offset metadata.
 
 ## Finance Operations
 
@@ -134,6 +152,7 @@ Operations:
 - `finance.simple-interest`
 - `finance.compound-interest`
 - `finance.loan-payment`
+- `finance.vat`
 - `finance.percentage-change`
 - `finance.margin-markup`
 - `finance.cagr`
@@ -161,6 +180,17 @@ Loan payment:
 ```
 
 Loan payments assume fixed end-of-period payments. Fees, taxes, escrow, and prepayments are excluded. `totalPaid` and `totalInterest` are computed from the displayed rounded payment and use `basis: "displayed-payment"`.
+
+VAT:
+
+```json
+{
+  "netAmount": { "kind": "integer", "value": "100" },
+  "vatRate": { "kind": "decimal", "value": "0.20", "scale": 2 }
+}
+```
+
+VAT uses a decimal rate, not a percentage whole number. Amounts and rate must be non-negative. The generic result `value` is the gross amount; `result.details` carries `netAmount`, `vatAmount`, and `grossAmount`. When output rounding is requested, `grossAmount` is the displayed `netAmount + vatAmount` so returned components stay internally consistent.
 
 Percentage change:
 
@@ -260,12 +290,13 @@ The generic result `value` is the generated case count. `result.details.cases` c
 Registered tools:
 
 - `compute_arithmetic`
+- `compute_expression`
+- `convert_units`
 - `calculate_finance`
 - `verify_result`
 - `generate_expected_values`
-- `compute_expression`
 
-`compute_arithmetic`, `calculate_finance`, `verify_result`, and `generate_expected_values` invoke the Rust CLI and return both JSON text content and `structuredContent`:
+All registered tools invoke the Rust CLI and return both JSON text content and `structuredContent`:
 
 ```json
 {
@@ -283,18 +314,3 @@ Registered tools:
   }
 }
 ```
-
-`compute_expression` currently returns:
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "not-implemented",
-    "message": "expression.evaluate is not wired through the current MCP wrapper"
-  },
-  "version": "mcp-wrapper"
-}
-```
-
-The integration boundary is that the wrapper has not yet been updated to invoke the CLI for expressions.

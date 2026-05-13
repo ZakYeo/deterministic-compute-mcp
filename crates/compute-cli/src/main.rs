@@ -18,9 +18,11 @@ Supported operations:
   arithmetic.multiply
   arithmetic.divide
   expression.evaluate
+  units.convert
   finance.simple-interest
   finance.compound-interest
   finance.loan-payment
+  finance.vat
   finance.percentage-change
   finance.margin-markup
   finance.cagr
@@ -369,6 +371,84 @@ mod tests {
             json!({"kind": "decimal", "value": "88.85", "scale": 2})
         );
         assert_eq!(response["result"]["details"]["basis"], "displayed-payment");
+        Ok(())
+    }
+
+    #[test]
+    fn computes_unit_conversion_request_through_generic_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "units.convert",
+            "input": {
+                "value": {"kind": "integer", "value": "100"},
+                "sourceUnit": "cm",
+                "targetUnit": "m"
+            },
+            "precision": {
+                "decimalPlaces": 2,
+                "rounding": "exact"
+            },
+            "trace": true
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "units.convert");
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "decimal", "value": "1.00", "scale": 2})
+        );
+        assert_eq!(response["result"]["details"]["dimension"], "length");
+        assert_eq!(response["trace"][1]["operation"], "units.apply-factor");
+        Ok(())
+    }
+
+    #[test]
+    fn computes_vat_request_through_generic_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "finance.vat",
+            "input": {
+                "netAmount": {"kind": "integer", "value": "100"},
+                "vatRate": {"kind": "decimal", "value": "0.20", "scale": 2}
+            },
+            "precision": {
+                "decimalPlaces": 2,
+                "rounding": "exact"
+            }
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "finance.vat");
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "decimal", "value": "120.00", "scale": 2})
+        );
+        assert_eq!(
+            response["result"]["details"]["vatAmount"],
+            json!({"kind": "decimal", "value": "20.00", "scale": 2})
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_vat_request_through_generic_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "finance.vat",
+            "input": {
+                "netAmount": {"kind": "integer", "value": "-1"},
+                "vatRate": {"kind": "decimal", "value": "0.20", "scale": 2}
+            }
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], false);
+        assert_eq!(response["error"]["code"], "invalid-input");
         Ok(())
     }
 

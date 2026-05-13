@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 const SIMPLE_INTEREST_OPERATION_ID: &str = "finance.simple-interest";
 const COMPOUND_INTEREST_OPERATION_ID: &str = "finance.compound-interest";
 const LOAN_PAYMENT_OPERATION_ID: &str = "finance.loan-payment";
+const VAT_OPERATION_ID: &str = "finance.vat";
 const PERCENTAGE_CHANGE_OPERATION_ID: &str = "finance.percentage-change";
 const MARGIN_MARKUP_OPERATION_ID: &str = "finance.margin-markup";
 const CAGR_OPERATION_ID: &str = "finance.cagr";
@@ -62,6 +63,19 @@ pub struct MarginMarkupResult {
     pub operation: String,
     pub margin: NumericValue,
     pub markup: NumericValue,
+    pub metadata: FinanceMetadata,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trace: Vec<FinanceTraceStep>,
+}
+
+/// VAT result for a net amount and decimal VAT rate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VatResult {
+    pub operation: String,
+    pub net_amount: NumericValue,
+    pub vat_amount: NumericValue,
+    pub gross_amount: NumericValue,
     pub metadata: FinanceMetadata,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub trace: Vec<FinanceTraceStep>,
@@ -280,6 +294,60 @@ pub fn loan_payment(
                 "payment is fixed and fully amortizes the principal over periods".to_owned(),
                 "total_paid and total_interest are computed from the displayed payment".to_owned(),
                 "fees, taxes, escrow, and prepayments are excluded".to_owned(),
+            ],
+        ),
+        trace: trace.steps,
+    })
+}
+
+/// Computes VAT from a non-negative net amount and decimal VAT rate.
+pub fn vat_from_net(
+    net_amount: Number,
+    vat_rate: Number,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> Result<VatResult, ComputeError> {
+    validate_non_negative(net_amount, "net_amount")?;
+    validate_rate_greater_than_or_equal_to_zero(vat_rate, "vat_rate")?;
+
+    let mut trace = FinanceTrace::new(include_trace);
+    let vat_rational = multiply_rationals(
+        number_rational(net_amount)?,
+        number_rational(vat_rate)?,
+        "VAT amount overflow",
+    )?;
+    let net_value = rational_to_number(number_rational(net_amount)?, precision, "VAT net amount")?;
+    let vat_value = rational_to_number(vat_rational, precision, "VAT amount")?;
+    let gross_value = rational_to_number(
+        add_rationals(
+            number_rational(net_value)?,
+            number_rational(vat_value)?,
+            "VAT displayed gross amount overflow",
+        )?,
+        precision,
+        "VAT displayed gross amount",
+    )?;
+
+    trace.record(
+        "finance.vat.formula",
+        vec![net_amount, vat_rate],
+        Some(gross_value),
+        "vat_amount = net_amount * vat_rate; displayed gross_amount = displayed net_amount + displayed vat_amount",
+    );
+
+    Ok(VatResult {
+        operation: VAT_OPERATION_ID.to_owned(),
+        net_amount: net_value.into(),
+        vat_amount: vat_value.into(),
+        gross_amount: gross_value.into(),
+        metadata: metadata(
+            VAT_OPERATION_ID,
+            precision,
+            vec![
+                "vat_rate is a decimal rate, not a percentage whole number".to_owned(),
+                "net_amount and vat_rate must be non-negative".to_owned(),
+                "VAT is computed from the supplied net amount; exemptions and jurisdiction-specific rules are excluded".to_owned(),
+                "gross_amount equals displayed net_amount plus displayed vat_amount at the requested precision".to_owned(),
             ],
         ),
         trace: trace.steps,
@@ -1110,6 +1178,102 @@ mod tests {
             }
         );
         assert!(result.trace.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn computes_vat_from_net_amount() -> Result<(), ComputeError> {
+        let result = vat_from_net(Number::Integer(100), decimal("0.20")?, exact_scale(2), true)?;
+
+        assert_eq!(
+            result.net_amount,
+            NumericValue::Decimal {
+                value: "100.00".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(
+            result.vat_amount,
+            NumericValue::Decimal {
+                value: "20.00".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(
+            result.gross_amount,
+            NumericValue::Decimal {
+                value: "120.00".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(result.metadata.operation, VAT_OPERATION_ID);
+        assert_eq!(result.trace[0].operation, "finance.vat.formula");
+        Ok(())
+    }
+
+    #[test]
+    fn vat_displayed_gross_matches_displayed_components() -> Result<(), ComputeError> {
+        let result = vat_from_net(
+            decimal("0.025")?,
+            decimal("0.20")?,
+            PrecisionPolicy {
+                decimal_places: Some(2),
+                rounding: RoundingMode::HalfAwayFromZero,
+            },
+            true,
+        )?;
+
+        assert_eq!(
+            result.net_amount,
+            NumericValue::Decimal {
+                value: "0.03".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(
+            result.vat_amount,
+            NumericValue::Decimal {
+                value: "0.01".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(
+            result.gross_amount,
+            NumericValue::Decimal {
+                value: "0.04".to_owned(),
+                scale: 2,
+            }
+        );
+        assert_eq!(
+            result.trace[0].output,
+            Some(NumericValue::Decimal {
+                value: "0.04".to_owned(),
+                scale: 2,
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_negative_vat_inputs() -> Result<(), ComputeError> {
+        let negative_amount =
+            vat_from_net(Number::Integer(-1), decimal("0.20")?, exact_scale(2), false).err();
+        let negative_rate = vat_from_net(
+            Number::Integer(100),
+            decimal("-0.01")?,
+            exact_scale(2),
+            false,
+        )
+        .err();
+
+        assert_eq!(
+            negative_amount.as_ref().map(|error| error.code),
+            Some(ErrorCode::InvalidInput)
+        );
+        assert_eq!(
+            negative_rate.as_ref().map(|error| error.code),
+            Some(ErrorCode::InvalidInput)
+        );
         Ok(())
     }
 

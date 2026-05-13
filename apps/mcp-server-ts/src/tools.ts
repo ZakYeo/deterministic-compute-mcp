@@ -2,8 +2,10 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
 
 import {
   buildArithmeticRequest,
+  buildExpressionRequest,
   buildFinanceRequest,
   buildTestGenerationRequest,
+  buildUnitConversionRequest,
   buildVerificationRequest,
   invokeComputeCli,
   type CliCommand,
@@ -16,6 +18,7 @@ import type {
   ExpressionToolInput,
   FinanceToolInput,
   TestGenerationToolInput,
+  UnitConversionToolInput,
   VerificationToolInput,
 } from "./schemas.js";
 
@@ -23,29 +26,12 @@ export type ToolPayload = {
   tool:
     | "compute_arithmetic"
     | "compute_expression"
+    | "convert_units"
     | "calculate_finance"
     | "generate_expected_values"
     | "verify_result";
-  request: ComputeRequest | ExpressionComputeRequest;
-  response: CliResult | ExpressionFailure;
-};
-
-export type ExpressionFailure = {
-  ok: false;
-  error: {
-    code: "not-implemented";
-    message: string;
-  };
-  version: "mcp-wrapper";
-};
-
-export type ExpressionComputeRequest = {
-  operation: "expression.evaluate";
-  input: {
-    expression: string;
-  };
-  precision?: ExpressionToolInput["precision"];
-  trace: boolean;
+  request: ComputeRequest;
+  response: CliResult;
 };
 
 export function buildToolResult(payload: ToolPayload): CallToolResult {
@@ -118,31 +104,32 @@ export async function buildTestGenerationToolResult(
   });
 }
 
-export function buildExpressionToolResult(
+export async function buildExpressionToolResult(
   input: ExpressionToolInput,
-): CallToolResult {
-  const request: ExpressionComputeRequest = {
-    operation: "expression.evaluate",
-    input: {
-      expression: input.expression,
-    },
-    trace: input.trace ?? false,
-  };
-
-  if (input.precision) {
-    request.precision = input.precision;
-  }
+  runner?: ProcessRunner,
+  commandConfig?: CliCommand,
+): Promise<CallToolResult> {
+  const request = buildExpressionRequest(input);
+  const response = await invokeComputeCli(request, runner, commandConfig);
 
   return buildToolResult({
     tool: "compute_expression",
     request,
-    response: {
-      ok: false,
-      error: {
-        code: "not-implemented",
-        message: "expression.evaluate is not wired through the current MCP wrapper",
-      },
-      version: "mcp-wrapper",
-    },
+    response,
+  });
+}
+
+export async function buildUnitConversionToolResult(
+  input: UnitConversionToolInput,
+  runner?: ProcessRunner,
+  commandConfig?: CliCommand,
+): Promise<CallToolResult> {
+  const request = buildUnitConversionRequest(input);
+  const response = await invokeComputeCli(request, runner, commandConfig);
+
+  return buildToolResult({
+    tool: "convert_units",
+    request,
+    response,
   });
 }

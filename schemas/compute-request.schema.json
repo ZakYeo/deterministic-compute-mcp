@@ -8,7 +8,7 @@
   "properties": {
     "operation": {
       "type": "string",
-      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, finance.cagr, verification.compare, or test-generation.generate-expected-values. CAGR supports only exact roots representable at the requested decimalPlaces."
+      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, units.convert, finance.vat, finance.loan-payment, finance.cagr, verification.compare, or test-generation.generate-expected-values. CAGR supports only exact roots representable at the requested decimalPlaces."
     },
     "input": {
       "type": "object",
@@ -25,6 +25,40 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "units.convert"
+          }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "$ref": "#/$defs/UnitConversionInput"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "finance.vat"
+          }
+        },
+        "required": ["operation"]
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "$ref": "#/$defs/VatInput"
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
@@ -153,6 +187,42 @@
         }
       ]
     },
+    "UnitConversionInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sourceUnit", "targetUnit"],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "sourceUnit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Supported source unit symbol or name, such as m, cm, ft, kg, lb, s, min, h, C, F, or K."
+        },
+        "targetUnit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "Supported target unit symbol or name compatible with sourceUnit."
+        }
+      }
+    },
+    "VatInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["netAmount", "vatRate"],
+      "properties": {
+        "netAmount": {
+          "$ref": "#/$defs/NonNegativeNumericValue"
+        },
+        "vatRate": {
+          "$ref": "#/$defs/NonNegativeNumericValue",
+          "description": "Decimal VAT rate, not a percentage whole number."
+        }
+      }
+    },
     "VerificationCompareInput": {
       "type": "object",
       "additionalProperties": false,
@@ -190,9 +260,11 @@
             "finance.simple-interest",
             "finance.compound-interest",
             "finance.loan-payment",
+            "finance.vat",
             "finance.percentage-change",
             "finance.margin-markup",
             "finance.cagr",
+            "units.convert",
             "verification.compare"
           ],
           "description": "Supported compute operation to evaluate for this expected value. Recursive test-generation.generate-expected-values cases are rejected."

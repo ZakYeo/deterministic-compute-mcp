@@ -20,6 +20,8 @@ pub mod verification;
 
 use precision::MAX_DECIMAL_SCALE;
 
+const MAX_UNIT_IDENTIFIER_CHARS: usize = 32;
+
 /// Current foundation API status for downstream scaffolds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -635,10 +637,25 @@ struct SimpleInterestInput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct UnitConversionInput {
+    value: NumericValue,
+    source_unit: String,
+    target_unit: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct LoanPaymentInput {
     principal: NumericValue,
     periodic_rate: NumericValue,
     periods: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VatInput {
+    net_amount: NumericValue,
+    vat_rate: NumericValue,
 }
 
 #[derive(Debug, Deserialize)]
@@ -702,6 +719,7 @@ pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
             request.trace,
         ),
         "expression.evaluate" => evaluate_expression_request(request.input, precision, request.trace),
+        "units.convert" => evaluate_unit_conversion_request(request.input, precision, request.trace),
         "finance.simple-interest" => {
             evaluate_simple_interest_request(request.input, precision, request.trace)
         }
@@ -709,6 +727,7 @@ pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
             evaluate_compound_interest_request(request.input, precision, request.trace)
         }
         "finance.loan-payment" => evaluate_loan_payment_request(request.input, precision, request.trace),
+        "finance.vat" => evaluate_vat_request(request.input, precision, request.trace),
         "finance.percentage-change" => {
             evaluate_percentage_change_request(request.input, precision, request.trace)
         }
@@ -724,7 +743,7 @@ pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
             ComputeError {
                 code: ErrorCode::InvalidInput,
                 message: format!("unsupported operation: {operation}"),
-                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, finance.cagr, verification.compare, and test-generation.generate-expected-values".to_owned()),
+                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, units.convert, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.vat, finance.percentage-change, finance.margin-markup, finance.cagr, verification.compare, and test-generation.generate-expected-values".to_owned()),
             },
             None,
         ),
@@ -773,6 +792,55 @@ fn evaluate_expression_request(
         }
     };
     expression::evaluate_expression(&input.expression, precision, include_trace)
+}
+
+fn evaluate_unit_conversion_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<UnitConversionInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid unit conversion input", error),
+                None,
+            )
+        }
+    };
+    let value = match input.value.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    if let Err(error) = validate_unit_identifier("sourceUnit", &input.source_unit) {
+        return ComputeResponse::failure(error, None);
+    }
+    if let Err(error) = validate_unit_identifier("targetUnit", &input.target_unit) {
+        return ComputeResponse::failure(error, None);
+    }
+
+    units::convert_units(
+        value,
+        &input.source_unit,
+        &input.target_unit,
+        precision,
+        include_trace,
+    )
+    .map(unit_conversion_response)
+    .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn validate_unit_identifier(field: &str, value: &str) -> Result<(), ComputeError> {
+    if value.chars().count() > MAX_UNIT_IDENTIFIER_CHARS {
+        return Err(ComputeError {
+            code: ErrorCode::InvalidInput,
+            message: "unit identifier is too long".to_owned(),
+            detail: Some(format!(
+                "{field} must be at most {MAX_UNIT_IDENTIFIER_CHARS} characters"
+            )),
+        });
+    }
+    Ok(())
 }
 
 fn evaluate_simple_interest_request(
@@ -875,6 +943,34 @@ fn evaluate_loan_payment_request(
     )
     .map(loan_payment_response)
     .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_vat_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<VatInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid VAT input", error),
+                None,
+            )
+        }
+    };
+    let net_amount = match input.net_amount.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let vat_rate = match input.vat_rate.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::vat_from_net(net_amount, vat_rate, precision, include_trace)
+        .map(vat_response)
+        .unwrap_or_else(|error| ComputeResponse::failure(error, None))
 }
 
 fn evaluate_percentage_change_request(
@@ -1039,6 +1135,38 @@ fn finance_calculation_response(result: finance::FinanceCalculationResult) -> Co
     )
 }
 
+fn unit_conversion_response(result: units::UnitConversionResult) -> ComputeResponse {
+    let value = result.value.clone();
+    let details = serde_json::json!({
+        "dimension": result.dimension,
+        "sourceUnit": result.metadata.source_unit,
+        "targetUnit": result.metadata.target_unit,
+        "conversionKind": result.metadata.conversion_kind,
+        "factorNumerator": result.metadata.factor_numerator,
+        "factorDenominator": result.metadata.factor_denominator,
+        "scaleNumerator": result.metadata.scale_numerator,
+        "scaleDenominator": result.metadata.scale_denominator,
+        "offsetNumerator": result.metadata.offset_numerator,
+        "offsetDenominator": result.metadata.offset_denominator,
+        "offset": result.metadata.offset,
+    });
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value,
+            metadata: ResultMetadata {
+                engine_version: result.metadata.engine_version,
+                numeric_kind: numeric_value_kind(&result.value),
+                precision: result.metadata.precision,
+                deterministic: result.metadata.deterministic,
+                assumptions: result.metadata.assumptions,
+            },
+            details: Some(details),
+        },
+        unit_trace_to_core_trace(result.trace),
+    )
+}
+
 fn loan_payment_response(result: finance::LoanPaymentResult) -> ComputeResponse {
     let payment = result.payment.clone();
     let details = serde_json::to_value(&result.summary).ok();
@@ -1048,6 +1176,24 @@ fn loan_payment_response(result: finance::LoanPaymentResult) -> ComputeResponse 
             value: payment,
             metadata: finance_metadata_to_result_metadata(result.metadata, result.payment),
             details,
+        },
+        finance_trace_to_core_trace(result.trace),
+    )
+}
+
+fn vat_response(result: finance::VatResult) -> ComputeResponse {
+    let gross_amount = result.gross_amount.clone();
+    let details = serde_json::json!({
+        "netAmount": result.net_amount,
+        "vatAmount": result.vat_amount,
+        "grossAmount": result.gross_amount,
+    });
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value: gross_amount,
+            metadata: finance_metadata_to_result_metadata(result.metadata, result.gross_amount),
+            details: Some(details),
         },
         finance_trace_to_core_trace(result.trace),
     )
@@ -1080,6 +1226,22 @@ fn finance_metadata_to_result_metadata(
         deterministic: metadata.deterministic,
         assumptions: metadata.assumptions,
     }
+}
+
+fn unit_trace_to_core_trace(trace: Vec<units::UnitTraceStep>) -> Option<Vec<TraceStep>> {
+    (!trace.is_empty()).then(|| {
+        trace
+            .into_iter()
+            .map(|step| TraceStep {
+                step: step.step,
+                operation: step.operation,
+                inputs: vec![step.input],
+                output: Some(step.output),
+                note: step.note,
+                metadata: None,
+            })
+            .collect()
+    })
 }
 
 fn finance_trace_to_core_trace(trace: Vec<finance::FinanceTraceStep>) -> Option<Vec<TraceStep>> {
@@ -2083,6 +2245,49 @@ mod tests {
             json!({"kind": "integer", "value": "14"})
         );
         Ok(())
+    }
+
+    #[test]
+    fn rejects_overlong_unit_identifiers_through_generic_dispatch() {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "units.convert".to_owned(),
+            input: json!({
+                "value": {"kind": "integer", "value": "1"},
+                "sourceUnit": "x".repeat(33),
+                "targetUnit": "m"
+            }),
+            precision: None,
+            trace: false,
+        });
+
+        assert!(!response.ok);
+        assert_eq!(
+            response.error.map(|error| (error.code, error.detail)),
+            Some((
+                ErrorCode::InvalidInput,
+                Some("sourceUnit must be at most 32 characters".to_owned())
+            ))
+        );
+    }
+
+    #[test]
+    fn accepts_multibyte_unit_identifiers_within_character_bound_through_generic_dispatch() {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "units.convert".to_owned(),
+            input: json!({
+                "value": {"kind": "integer", "value": "1"},
+                "sourceUnit": "å".repeat(32),
+                "targetUnit": "m"
+            }),
+            precision: None,
+            trace: false,
+        });
+
+        assert!(!response.ok);
+        assert_eq!(
+            response.error.map(|error| error.message),
+            Some("unknown unit".to_owned())
+        );
     }
 
     #[test]

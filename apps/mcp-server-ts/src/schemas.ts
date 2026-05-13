@@ -2,6 +2,7 @@ import * as z from "zod/v4";
 
 const MAX_EXPECTED_VALUE_CASE_ID_BYTES = 128;
 const MAX_EXPECTED_VALUE_CASE_INPUT_BYTES = 16 * 1024;
+const MAX_UNIT_IDENTIFIER_CHARS = 32;
 
 export const roundingModeSchema = z.enum([
   "exact",
@@ -100,6 +101,27 @@ export const expressionToolInputSchema = z
   })
   .strict();
 
+export const unitConversionToolInputSchema = z
+  .object({
+    value: numericValueSchema,
+    sourceUnit: z
+      .string()
+      .trim()
+      .min(1)
+      .max(MAX_UNIT_IDENTIFIER_CHARS),
+    targetUnit: z
+      .string()
+      .trim()
+      .min(1)
+      .max(MAX_UNIT_IDENTIFIER_CHARS),
+    precision: precisionPolicySchema.optional(),
+    trace: z
+      .boolean()
+      .default(false)
+      .describe("Whether to request deterministic trace metadata."),
+  })
+  .strict();
+
 export const verificationToleranceSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -151,9 +173,11 @@ export const expectedValueCaseSchema = z
         "finance.simple-interest",
         "finance.compound-interest",
         "finance.loan-payment",
+        "finance.vat",
         "finance.percentage-change",
         "finance.margin-markup",
         "finance.cagr",
+        "units.convert",
         "verification.compare",
       ])
       .describe("Supported compute operation used to generate this expected value."),
@@ -244,6 +268,16 @@ export const financeToolInputSchema = z.discriminatedUnion("operation", [
     .strict(),
   z
     .object({
+      operation: z.literal("vat"),
+      netAmount: nonNegativeNumericValueSchema,
+      vatRate: nonNegativeNumericValueSchema.describe(
+        "Decimal VAT rate, not a percentage whole number.",
+      ),
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
       operation: z.literal("percentage-change"),
       oldValue: numericValueSchema,
       newValue: numericValueSchema,
@@ -278,6 +312,9 @@ export const financeToolInputSchema = z.discriminatedUnion("operation", [
 export type ArithmeticToolInput = z.infer<typeof arithmeticToolInputSchema>;
 export type ExpressionToolInput = z.infer<typeof expressionToolInputSchema>;
 export type FinanceToolInput = z.infer<typeof financeToolInputSchema>;
+export type UnitConversionToolInput = z.infer<
+  typeof unitConversionToolInputSchema
+>;
 export type TestGenerationToolInput = z.infer<
   typeof testGenerationToolInputSchema
 >;
