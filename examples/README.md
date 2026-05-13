@@ -1,7 +1,20 @@
 # Examples
 
-These examples describe generic request and response shapes.
+This directory contains runnable compute request payloads for the Rust CLI plus one sample response.
 
-- `compute-request.json`: planned generic compute request.
-- `compute-response.json`: planned generic compute response.
-- `generate-expected-values-request.json`: deterministic expected-value generation request.
+Run one example:
+
+```sh
+cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/arithmetic-request.json
+```
+
+Files:
+
+- `arithmetic-request.json`: rounded deterministic division.
+- `expression-request.json`: arithmetic expression evaluation.
+- `compute-request.json`: fixed loan payment with trace output.
+- `compute-response.json`: sample response for `compute-request.json`.
+- `verification-request.json`: absolute-tolerance comparison.
+- `generate-expected-values-request.json`: expected-value generation across arithmetic, expression, finance, and verification cases.
+
+All numeric values are JSON-safe tagged values. Decimal `scale` must match the fractional digit count in `value`.
