@@ -88,9 +88,39 @@ Ownership note: `Cargo.lock` changed outside `crates/compute-cli/**` because `co
 - `cargo test --workspace`: passed with 13 `compute-cli` tests and 30 `compute-core` tests.
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
 
+## TypeScript MCP Server Status
+
+Branch: `agent/typescript-mcp-server`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 88/100, changes requested for `structuredContent`, decimal scale validation, process hardening, and dependency pinning.
+- Second review: 91/100, passed. New files were staged before merge.
+
+The TypeScript MCP server now includes:
+
+- SDK-backed MCP stdio server using `@modelcontextprotocol/server`.
+- `compute_arithmetic` tool wired to the Rust compute CLI.
+- `compute_expression` deterministic not-implemented response until the expression engine lands.
+- Zod v4 input schemas for arithmetic, expression, precision, rounding, trace, and JSON-safe numeric values.
+- Decimal value/scale validation aligned with `compute-core`.
+- Machine-readable tool results through both JSON text content and `structuredContent`.
+- Configurable CLI invocation with deterministic timeout, output-size, nonzero-exit, and invalid-JSON failure responses.
+- Tests for schema validation, request building, structured tool content, CLI wrapper behavior, and process hardening.
+
+Ownership note: all edits stayed under `apps/mcp-server-ts/**`.
+
+## TypeScript MCP Server Checks
+
+- `npm --prefix apps/mcp-server-ts run typecheck`: passed.
+- `npm --prefix apps/mcp-server-ts run build`: passed.
+- `npm --prefix apps/mcp-server-ts test`: passed.
+- `cargo test -p compute-cli`: passed with 13 tests.
+
 ## Next Workstreams
 
-- `agent/typescript-mcp-server`: implement MCP SDK wiring, tool registration, schema validation, and CLI process integration.
 - `agent/expression-engine`: add safe expression parsing, AST evaluation, and proof traces.
 - `agent/units`: add unit conversion and dimensional analysis.
 - `agent/finance`: add finance/business calculators with documented assumptions.
