@@ -26,16 +26,18 @@ The generic Rust dispatcher accepts:
 - `arithmetic.multiply`
 - `arithmetic.divide`
 - `expression.evaluate`
+- `units.convert`
 - `finance.simple-interest`
 - `finance.compound-interest`
 - `finance.loan-payment`
+- `finance.vat`
 - `finance.percentage-change`
 - `finance.margin-markup`
 - `finance.cagr`
 - `verification.compare`
 - `test-generation.generate-expected-values`
 
-The TypeScript MCP wrapper currently exposes arithmetic, finance, verification, and expected-value generation through the CLI. `compute_expression` remains a wrapper-level placeholder even though the Rust CLI supports `expression.evaluate`. Unit conversion is implemented as a Rust core module but is not yet exposed through the generic CLI/MCP dispatcher.
+The TypeScript MCP wrapper exposes arithmetic, expression evaluation, unit conversion, finance, verification, and expected-value generation through the CLI.
 
 ## Determinism Rules
 

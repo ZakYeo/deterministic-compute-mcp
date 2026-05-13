@@ -58,6 +58,41 @@
         }
       },
       {
+        "id": "vat-from-net",
+        "operation": "finance.vat",
+        "input": {
+          "netAmount": {
+            "kind": "integer",
+            "value": "100"
+          },
+          "vatRate": {
+            "kind": "decimal",
+            "value": "0.20",
+            "scale": 2
+          }
+        },
+        "precision": {
+          "decimalPlaces": 2,
+          "rounding": "exact"
+        }
+      },
+      {
+        "id": "unit-conversion",
+        "operation": "units.convert",
+        "input": {
+          "value": {
+            "kind": "integer",
+            "value": "100"
+          },
+          "sourceUnit": "cm",
+          "targetUnit": "m"
+        },
+        "precision": {
+          "decimalPlaces": 2,
+          "rounding": "exact"
+        }
+      },
+      {
         "id": "absolute-tolerance",
         "operation": "verification.compare",
         "input": {

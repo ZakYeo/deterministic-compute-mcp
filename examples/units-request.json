@@ -1,0 +1,13 @@
+{
+  "operation": "units.convert",
+  "input": {
+    "value": { "kind": "integer", "value": "100" },
+    "sourceUnit": "cm",
+    "targetUnit": "m"
+  },
+  "precision": {
+    "decimalPlaces": 2,
+    "rounding": "exact"
+  },
+  "trace": true
+}

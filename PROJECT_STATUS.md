@@ -321,9 +321,23 @@ Ownership note: changes stayed within `README.md`, `docs/**`, and `examples/**`.
 
 No core workstreams remain.
 
+## Integration Fixes Workstream
+
+Branch: `agent/integration-fixes`
+
+Status: implemented and reviewed
+
+The integration fixes workstream closes the MVP audit gaps:
+
+- `units.convert` is wired through generic core dispatch, Rust CLI help/tests, public schemas/examples/docs, and the MCP `convert_units` tool.
+- MCP `compute_expression` now invokes the Rust CLI instead of returning wrapper-level `not-implemented`.
+- `finance.vat` computes from non-negative net amount and decimal VAT rate without floats, returning internally consistent machine-readable `netAmount`, `vatAmount`, and `grossAmount`.
+- Public docs and roadmap no longer list expression MCP wiring or unit conversion exposure as remaining gaps.
+- Review history: 88/100, changes requested for VAT rounded component consistency, unit identifier bounds, and real CLI-backed MCP tests; 92/100 after fixes, approved with minor cleanup completed.
+
 ## Final Integration Audit
 
-Status: complete
+Status: superseded; final audit will be rerun after integration fixes merge
 
 Final audit findings:
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 const UNITS_OPERATION_ID: &str = "units.convert";
 const MAX_DECIMAL_SCALE: u32 = 38;
+const MAX_UNKNOWN_UNIT_DETAIL_CHARS: usize = 64;
 
 /// Supported physical dimensions for unit conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -648,10 +649,19 @@ fn incompatible_dimensions(source: UnitDefinition, target: UnitDefinition) -> Co
 }
 
 fn unknown_unit(unit: &str) -> ComputeError {
+    let trimmed = unit.trim();
+    let mut detail = trimmed
+        .chars()
+        .take(MAX_UNKNOWN_UNIT_DETAIL_CHARS)
+        .collect::<String>();
+    if trimmed.chars().count() > MAX_UNKNOWN_UNIT_DETAIL_CHARS {
+        detail.push_str("...");
+    }
+
     ComputeError {
         code: ErrorCode::InvalidInput,
         message: "unknown unit".to_owned(),
-        detail: Some(format!("unknown unit: {}", unit.trim())),
+        detail: Some(format!("unknown unit: {detail}")),
     }
 }
 
@@ -970,6 +980,24 @@ mod tests {
         assert_eq!(
             error.and_then(|error| error.detail),
             Some("unknown unit: parsec".to_owned())
+        );
+    }
+
+    #[test]
+    fn truncates_unknown_unit_error_detail() {
+        let long_unit = "x".repeat(80);
+        let error = convert_units(
+            Number::Integer(1),
+            &long_unit,
+            "m",
+            PrecisionPolicy::default(),
+            false,
+        )
+        .err();
+
+        assert_eq!(
+            error.and_then(|error| error.detail),
+            Some(format!("unknown unit: {}...", "x".repeat(64)))
         );
     }
 

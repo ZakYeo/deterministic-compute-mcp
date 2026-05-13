@@ -7,11 +7,13 @@ import {
   expressionToolInputSchema,
   financeToolInputSchema,
   testGenerationToolInputSchema,
+  unitConversionToolInputSchema,
   verificationToolInputSchema,
   type ArithmeticToolInput,
   type ExpressionToolInput,
   type FinanceToolInput,
   type TestGenerationToolInput,
+  type UnitConversionToolInput,
   type VerificationToolInput,
 } from "./schemas.js";
 import {
@@ -19,6 +21,7 @@ import {
   buildExpressionToolResult,
   buildFinanceToolResult,
   buildTestGenerationToolResult,
+  buildUnitConversionToolResult,
   buildVerificationToolResult,
 } from "./tools.js";
 
@@ -41,10 +44,20 @@ server.registerTool(
   "compute_expression",
   {
     description:
-      "Expression evaluation placeholder. The expression engine is not registered in the accepted CLI yet.",
+      "Run deterministic arithmetic expression evaluation through the Rust compute CLI.",
     inputSchema: expressionToolInputSchema,
   },
   async (input: ExpressionToolInput) => buildExpressionToolResult(input),
+);
+
+server.registerTool(
+  "convert_units",
+  {
+    description:
+      "Convert deterministic numeric values between supported units through the Rust compute CLI.",
+    inputSchema: unitConversionToolInputSchema,
+  },
+  async (input: UnitConversionToolInput) => buildUnitConversionToolResult(input),
 );
 
 server.registerTool(

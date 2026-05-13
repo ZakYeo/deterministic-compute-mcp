@@ -2,13 +2,13 @@
 
 `deterministic-compute-mcp` is a Rust-first deterministic computation engine with a TypeScript MCP wrapper for agent workflows. It gives Codex users a local tool for exact numeric calculations, finance/business math, result verification, and expected-value generation with machine-readable JSON output.
 
-The project currently implements the Rust compute core, JSON CLI, and MCP stdio wrapper for the exposed operations below. Unit conversion exists in the Rust core module but is not yet wired into the generic CLI/MCP dispatcher.
+The project currently implements the Rust compute core, JSON CLI, and MCP stdio wrapper for the exposed operations below.
 
 ## Implemented Status
 
-- Rust core: JSON-safe integer and fixed-scale decimal arithmetic, expression evaluation, finance calculators, verification, and expected-value generation.
+- Rust core: JSON-safe integer and fixed-scale decimal arithmetic, expression evaluation, unit conversion, finance calculators, verification, and expected-value generation.
 - Rust CLI: reads a compute request from stdin or a file and writes a `ComputeResponse` JSON document.
-- TypeScript MCP server: exposes agent tools for arithmetic, finance, verification, and expected-value generation through the Rust CLI.
+- TypeScript MCP server: exposes agent tools for arithmetic, expressions, unit conversion, finance, verification, and expected-value generation through the Rust CLI.
 - Schemas/examples/docs: describe the generic request/response contracts and runnable example payloads.
 
 ## Architecture
@@ -93,7 +93,7 @@ Requests have this shape:
 }
 ```
 
-The JSON Schema validates the generic request envelope and includes operation-specific branches for verification and expected-value generation. Arithmetic, expression, and finance input payloads are validated by the Rust core and MCP schemas at runtime.
+The JSON Schema validates the generic request envelope and includes operation-specific branches for units, VAT, verification, and expected-value generation. Arithmetic, expression, and other finance input payloads are validated by the Rust core and MCP schemas at runtime.
 
 Numbers are JSON-safe tagged values:
 
@@ -109,16 +109,18 @@ Numbers are JSON-safe tagged values:
 - `arithmetic.multiply`
 - `arithmetic.divide`
 - `expression.evaluate`
+- `units.convert`
 - `finance.simple-interest`
 - `finance.compound-interest`
 - `finance.loan-payment`
+- `finance.vat`
 - `finance.percentage-change`
 - `finance.margin-markup`
 - `finance.cagr`
 - `verification.compare`
 - `test-generation.generate-expected-values`
 
-Finance rates are decimal rates per period, not percentage whole numbers. For example, 5% is `0.05`. CAGR requires `precision.decimalPlaces` and returns a `precision-issue` error when the root is not exactly representable at that scale.
+Finance rates are decimal rates per period, not percentage whole numbers. VAT rates are also decimal rates; for example, 20% VAT is `0.20`. `finance.vat` computes from a non-negative net amount and returns machine-readable `netAmount`, `vatAmount`, and `grossAmount` details. When output rounding is requested, `grossAmount` is the displayed `netAmount + vatAmount` so returned components stay internally consistent. CAGR requires `precision.decimalPlaces` and returns a `precision-issue` error when the root is not exactly representable at that scale.
 
 `verification.compare` returns the absolute difference as `result.value` and comparison metadata in `result.details`. `test-generation.generate-expected-values` evaluates bounded explicit cases through the same dispatcher and returns nested deterministic responses in `result.details.cases`.
 
@@ -154,10 +156,11 @@ Use an absolute CLI path when an MCP client may launch the server from a differe
 Registered MCP tools:
 
 - `compute_arithmetic`: `add`, `subtract`, `multiply`, `divide`.
-- `calculate_finance`: simple interest, compound interest, loan payment, percentage change, margin/markup, CAGR.
+- `compute_expression`: deterministic arithmetic expressions.
+- `convert_units`: deterministic unit conversion.
+- `calculate_finance`: simple interest, compound interest, loan payment, VAT, percentage change, margin/markup, CAGR.
 - `verify_result`: exact, absolute-tolerance, and relative-tolerance comparisons.
 - `generate_expected_values`: deterministic expected values for supported compute operations.
-- `compute_expression`: currently returns a wrapper-level not-implemented response. Use the CLI for `expression.evaluate` until the wrapper is wired through.
 
 Example MCP tool input for arithmetic:
 
@@ -184,6 +187,8 @@ Runnable request files are in `examples/`:
 
 - `arithmetic-request.json`
 - `expression-request.json`
+- `units-request.json`
+- `vat-request.json`
 - `compute-request.json`
 - `verification-request.json`
 - `generate-expected-values-request.json`

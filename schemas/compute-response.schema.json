@@ -11,7 +11,7 @@
     },
     "result": {
       "$ref": "#/$defs/ComputeResult",
-      "description": "Operation-specific deterministic result. For verification.compare, value is the absolute difference and details carries comparison metadata. For test-generation.generate-expected-values, value is the generated case count and details carries generated cases."
+      "description": "Operation-specific deterministic result. For units.convert, value is the converted value and details carries conversion metadata. For finance.vat, value is grossAmount and details carries net/vat/gross amounts. For verification.compare, value is the absolute difference and details carries comparison metadata. For test-generation.generate-expected-values, value is the generated case count and details carries generated cases."
     },
     "diagnostics": {
       "type": "array",
@@ -133,6 +133,12 @@
         "details": {
           "anyOf": [
             {
+              "$ref": "#/$defs/UnitConversionDetails"
+            },
+            {
+              "$ref": "#/$defs/VatDetails"
+            },
+            {
               "$ref": "#/$defs/VerificationDetails"
             },
             {
@@ -145,6 +151,42 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "units.convert"
+              }
+            },
+            "required": ["operation"]
+          },
+          "then": {
+            "required": ["details"],
+            "properties": {
+              "details": {
+                "$ref": "#/$defs/UnitConversionDetails"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "finance.vat"
+              }
+            },
+            "required": ["operation"]
+          },
+          "then": {
+            "required": ["details"],
+            "properties": {
+              "details": {
+                "$ref": "#/$defs/VatDetails"
+              }
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -196,6 +238,79 @@
     },
     "ToleranceKind": {
       "enum": ["absolute", "relative"]
+    },
+    "UnitDimension": {
+      "enum": ["length", "mass", "time", "temperature"]
+    },
+    "UnitConversionKind": {
+      "enum": ["linear", "affine"]
+    },
+    "UnitConversionDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "sourceUnit",
+        "targetUnit",
+        "conversionKind",
+        "factorNumerator",
+        "factorDenominator",
+        "scaleNumerator",
+        "scaleDenominator",
+        "offsetNumerator",
+        "offsetDenominator"
+      ],
+      "properties": {
+        "dimension": {
+          "$ref": "#/$defs/UnitDimension"
+        },
+        "sourceUnit": {
+          "type": "string"
+        },
+        "targetUnit": {
+          "type": "string"
+        },
+        "conversionKind": {
+          "$ref": "#/$defs/UnitConversionKind"
+        },
+        "factorNumerator": {
+          "type": "string"
+        },
+        "factorDenominator": {
+          "type": "string"
+        },
+        "scaleNumerator": {
+          "type": "string"
+        },
+        "scaleDenominator": {
+          "type": "string"
+        },
+        "offsetNumerator": {
+          "type": "string"
+        },
+        "offsetDenominator": {
+          "type": "string"
+        },
+        "offset": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "VatDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["netAmount", "vatAmount", "grossAmount"],
+      "properties": {
+        "netAmount": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "vatAmount": {
+          "$ref": "#/$defs/NumericValue"
+        },
+        "grossAmount": {
+          "$ref": "#/$defs/NumericValue"
+        }
+      }
     },
     "ToleranceDetails": {
       "type": "object",
