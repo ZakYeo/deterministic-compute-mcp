@@ -119,9 +119,39 @@ Ownership note: all edits stayed under `apps/mcp-server-ts/**`.
 - `npm --prefix apps/mcp-server-ts test`: passed.
 - `cargo test -p compute-cli`: passed with 13 tests.
 
+## Expression Engine Status
+
+Branch: `agent/expression-engine`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 82/100, changes requested for precision timing, depth safety, unary `i128::MIN`, crate-private precision exposure, and tokenization edge cases.
+- Second review: 91/100, passed with minor trace and test improvements requested.
+- Added final precision trace coverage, a structured repeating-decimal helper, and stricter depth-guard test assertions before merge.
+
+The expression engine now includes:
+
+- Safe tokenizer and recursive-descent parser for numbers, `+`, `-`, `*`, `/`, parentheses, and unary minus.
+- AST evaluation using existing compute-core numeric and arithmetic primitives.
+- Final-result precision application with special handling for rounded repeating division.
+- Structured invalid-input and precision errors for malformed expressions and unsupported tokens.
+- Deterministic trace steps for expression arithmetic and final precision adjustment.
+- Input length, token count, parser depth, and evaluator depth guards.
+- Tests for precedence, parentheses, unary minus, decimals, division and rounding, precision cancellation, invalid tokens, depth limits, trace determinism, and `i128::MIN`.
+
+Ownership note: changes stayed in `crates/compute-core/src/expression/**`, `crates/compute-core/src/precision/**`, and minimal `crates/compute-core/src/lib.rs` exposure.
+
+## Expression Engine Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 48 `compute-core` tests and 13 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets -- -D warnings`: passed.
+
 ## Next Workstreams
 
-- `agent/expression-engine`: add safe expression parsing, AST evaluation, and proof traces.
 - `agent/units`: add unit conversion and dimensional analysis.
 - `agent/finance`: add finance/business calculators with documented assumptions.
 - `agent/verification`: add exact and tolerance-based result comparison.
