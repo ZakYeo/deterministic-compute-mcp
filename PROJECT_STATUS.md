@@ -150,9 +150,40 @@ Ownership note: changes stayed in `crates/compute-core/src/expression/**`, `crat
 - `cargo test --workspace`: passed with 48 `compute-core` tests and 13 `compute-cli` tests.
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed.
 
+## Units Status
+
+Branch: `agent/units`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 78/100, changes requested for reduced linear conversion factors, affine temperature precision/metadata, case-sensitive symbols, and overflow coverage.
+- Second review: 88/100, changes requested for final requested-precision scaling overflow and safer GCD handling.
+- Third review: 88/100, changes requested for default exact decimal scaling overflow.
+- Split child workstream review: 96/100, passed. The focused default exact scaling fix and identity metadata snapshot were added before merge.
+
+The units module now includes:
+
+- Deterministic conversions for length, mass, time, and temperature.
+- Dimensional analysis with structured errors for incompatible dimensions and unknown units.
+- Reduced rational source-to-target conversion factors for linear units.
+- Exact affine temperature transforms with one final precision application.
+- Case-sensitive temperature symbols (`C`, `F`, `K`) with lowercase full names accepted.
+- Machine-readable conversion result, metadata, conversion kind, factor/scale/offset fields, assumptions, and deterministic trace steps.
+- Tests for exact conversions, decimal factors, precision and rounding, invalid units, incompatible dimensions, temperature affine conversions, metadata serialization, overflow boundaries, and `i128::MIN` scaling.
+
+Ownership note: changes stayed in `crates/compute-core/src/units/**` plus minimal `crates/compute-core/src/lib.rs` module exposure.
+
+## Units Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 72 `compute-core` tests and 13 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets -- -D warnings`: passed.
+
 ## Next Workstreams
 
-- `agent/units`: add unit conversion and dimensional analysis.
 - `agent/finance`: add finance/business calculators with documented assumptions.
 - `agent/verification`: add exact and tolerance-based result comparison.
 - `agent/test-generation`: add deterministic expected-value generation.
