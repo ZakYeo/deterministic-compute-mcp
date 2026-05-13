@@ -33,6 +33,53 @@
           "decimalPlaces": 2,
           "rounding": "half-away-from-zero"
         }
+      },
+      {
+        "id": "expression-precedence",
+        "operation": "expression.evaluate",
+        "input": {
+          "expression": "(2 + 3) * 4"
+        }
+      },
+      {
+        "id": "simple-interest",
+        "operation": "finance.simple-interest",
+        "input": {
+          "principal": {
+            "kind": "integer",
+            "value": "1000"
+          },
+          "periodicRate": {
+            "kind": "decimal",
+            "value": "0.05",
+            "scale": 2
+          },
+          "periods": 2
+        }
+      },
+      {
+        "id": "absolute-tolerance",
+        "operation": "verification.compare",
+        "input": {
+          "expected": {
+            "kind": "decimal",
+            "value": "10.00",
+            "scale": 2
+          },
+          "actual": {
+            "kind": "decimal",
+            "value": "10.01",
+            "scale": 2
+          },
+          "tolerance": {
+            "kind": "absolute",
+            "value": {
+              "kind": "decimal",
+              "value": "0.02",
+              "scale": 2
+            }
+          }
+        }
       }
     ],
     "failOnCaseError": false,

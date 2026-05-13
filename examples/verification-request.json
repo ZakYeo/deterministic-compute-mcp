@@ -1,0 +1,24 @@
+{
+  "operation": "verification.compare",
+  "input": {
+    "expected": {
+      "kind": "decimal",
+      "value": "10.00",
+      "scale": 2
+    },
+    "actual": {
+      "kind": "decimal",
+      "value": "10.01",
+      "scale": 2
+    },
+    "tolerance": {
+      "kind": "absolute",
+      "value": {
+        "kind": "decimal",
+        "value": "0.02",
+        "scale": 2
+      }
+    }
+  },
+  "trace": true
+}

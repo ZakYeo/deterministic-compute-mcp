@@ -1,0 +1,7 @@
+{
+  "operation": "expression.evaluate",
+  "input": {
+    "expression": "(2 + 3) * 4"
+  },
+  "trace": true
+}

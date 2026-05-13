@@ -24,17 +24,17 @@
       ]
     },
     "details": {
-      "periods": 12,
       "basis": "displayed-payment",
-      "totalPaid": {
-        "kind": "decimal",
-        "value": "1066.20",
-        "scale": 2
-      },
+      "periods": 12,
       "totalInterest": {
         "kind": "decimal",
-        "value": "66.20",
-        "scale": 2
+        "scale": 2,
+        "value": "66.20"
+      },
+      "totalPaid": {
+        "kind": "decimal",
+        "scale": 2,
+        "value": "1066.20"
       }
     }
   },

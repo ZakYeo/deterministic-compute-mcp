@@ -1,0 +1,18 @@
+{
+  "operation": "arithmetic.divide",
+  "input": {
+    "left": {
+      "kind": "integer",
+      "value": "2"
+    },
+    "right": {
+      "kind": "integer",
+      "value": "3"
+    }
+  },
+  "precision": {
+    "decimalPlaces": 2,
+    "rounding": "half-away-from-zero"
+  },
+  "trace": true
+}
