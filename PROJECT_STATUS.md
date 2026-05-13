@@ -288,9 +288,38 @@ Ownership note: the workstream expanded beyond `crates/compute-core/src/test_gen
 - `npm --prefix apps/mcp-server-ts run build`: passed.
 - `npm --prefix apps/mcp-server-ts test`: passed with 24 MCP tests.
 
+## Documentation Status
+
+Branch: `agent/docs`
+
+Status: complete and merged
+
+Review history:
+
+- Review: 91/100, passed. Applied review wording fixes for examples, exact rounding behavior, schema scope, and MCP CLI absolute-path guidance before merge.
+
+The documentation workstream now includes:
+
+- Current README with implemented status, architecture, prerequisites, build/test commands, CLI usage, MCP usage, supported operations, known integration gaps, and example usage.
+- Updated architecture, interfaces, and roadmap docs reflecting implemented behavior rather than foundation-only plans.
+- Concrete interface payloads for arithmetic, expression, finance, verification, and expected-value generation.
+- Runnable JSON examples for arithmetic, expression, finance loan payment, verification, and expected-value generation.
+- Example index language distinguishing request payloads from the sample response.
+- Documentation of current integration boundaries: expression is CLI-supported but MCP-placeholder, and units are core-only.
+
+Ownership note: changes stayed within `README.md`, `docs/**`, and `examples/**`.
+
+## Documentation Checks
+
+- Example JSON parsing: passed for all `examples/*.json`.
+- CLI execution: passed for arithmetic, expression, finance, verification, and expected-value generation request examples.
+- `cargo fmt --all -- --check`: passed.
+- `cargo test --workspace`: passed with 113 `compute-core` tests and 17 `compute-cli` tests.
+- `npm --prefix apps/mcp-server-ts test`: passed with 24 MCP tests.
+
 ## Next Workstreams
 
-- `agent/docs`: expand installation, usage, and integration docs.
+No core workstreams remain. Run final integration audit and address any findings.
 
 ## Coordination Notes
 
