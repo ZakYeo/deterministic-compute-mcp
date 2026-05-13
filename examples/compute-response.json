@@ -1,14 +1,69 @@
 {
   "ok": true,
   "result": {
-    "value": "4",
-    "type": "integer"
+    "operation": "finance.loan-payment",
+    "value": {
+      "kind": "decimal",
+      "value": "88.85",
+      "scale": 2
+    },
+    "metadata": {
+      "engineVersion": "0.1.0",
+      "numericKind": "decimal",
+      "precision": {
+        "decimalPlaces": 2,
+        "rounding": "half-away-from-zero"
+      },
+      "deterministic": true,
+      "assumptions": [
+        "periodic_rate is a decimal rate per payment period",
+        "payments occur at the end of each period",
+        "payment is fixed and fully amortizes the principal over periods",
+        "total_paid and total_interest are computed from the displayed payment",
+        "fees, taxes, escrow, and prepayments are excluded"
+      ]
+    },
+    "details": {
+      "periods": 12,
+      "basis": "displayed-payment",
+      "totalPaid": {
+        "kind": "decimal",
+        "value": "1066.20",
+        "scale": 2
+      },
+      "totalInterest": {
+        "kind": "decimal",
+        "value": "66.20",
+        "scale": 2
+      }
+    }
   },
   "diagnostics": [],
   "trace": [
     {
-      "step": "evaluate",
-      "detail": "2 + 2 = 4"
+      "step": 1,
+      "operation": "finance.loan-payment.formula",
+      "inputs": [
+        {
+          "kind": "integer",
+          "value": "1000"
+        },
+        {
+          "kind": "decimal",
+          "value": "0.01",
+          "scale": 2
+        },
+        {
+          "kind": "integer",
+          "value": "12"
+        }
+      ],
+      "output": {
+        "kind": "decimal",
+        "value": "88.85",
+        "scale": 2
+      },
+      "note": "payment = principal * periodic_rate * (1 + periodic_rate)^periods / ((1 + periodic_rate)^periods - 1); zero rate uses principal / periods"
     }
   ],
   "version": "0.1.0"

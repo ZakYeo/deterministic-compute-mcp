@@ -8,7 +8,7 @@
   "properties": {
     "operation": {
       "type": "string",
-      "description": "Stable operation identifier, such as expression.evaluate."
+      "description": "Stable operation identifier, such as arithmetic.add, expression.evaluate, finance.loan-payment, or finance.cagr. CAGR supports only exact roots representable at the requested decimalPlaces."
     },
     "input": {
       "type": "object",

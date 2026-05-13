@@ -1,8 +1,6 @@
 use compute_core::{
-    compute_binary, ArithmeticOperation, ComputeError, ComputeRequest, ComputeResponse, ErrorCode,
-    NumericValue,
+    evaluate_compute_request, ComputeError, ComputeRequest, ComputeResponse, ErrorCode,
 };
-use serde::Deserialize;
 use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -19,14 +17,14 @@ Supported operations:
   arithmetic.subtract
   arithmetic.multiply
   arithmetic.divide
+  expression.evaluate
+  finance.simple-interest
+  finance.compound-interest
+  finance.loan-payment
+  finance.percentage-change
+  finance.margin-markup
+  finance.cagr
 ";
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct BinaryInput {
-    left: NumericValue,
-    right: NumericValue,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 enum CliCommand {
@@ -158,47 +156,7 @@ fn response_from_json(input: &str) -> ComputeResponse {
         }
     };
 
-    evaluate_request(request)
-}
-
-fn evaluate_request(request: ComputeRequest) -> ComputeResponse {
-    let operation = match parse_operation(&request.operation) {
-        Ok(operation) => operation,
-        Err(error) => return ComputeResponse::failure(error, None),
-    };
-
-    let input = match serde_json::from_value::<BinaryInput>(request.input) {
-        Ok(input) => input,
-        Err(error) => {
-            return ComputeResponse::failure(invalid_input("invalid arithmetic input", error), None)
-        }
-    };
-
-    let left = match input.left.parse_number() {
-        Ok(number) => number,
-        Err(error) => return ComputeResponse::failure(error, None),
-    };
-    let right = match input.right.parse_number() {
-        Ok(number) => number,
-        Err(error) => return ComputeResponse::failure(error, None),
-    };
-    let precision = request.precision.unwrap_or_default();
-
-    compute_binary(operation, left, right, precision, request.trace)
-}
-
-fn parse_operation(operation: &str) -> Result<ArithmeticOperation, ComputeError> {
-    match operation {
-        "arithmetic.add" => Ok(ArithmeticOperation::Add),
-        "arithmetic.subtract" => Ok(ArithmeticOperation::Subtract),
-        "arithmetic.multiply" => Ok(ArithmeticOperation::Multiply),
-        "arithmetic.divide" => Ok(ArithmeticOperation::Divide),
-        _ => Err(ComputeError {
-            code: ErrorCode::InvalidInput,
-            message: format!("unsupported operation: {operation}"),
-            detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, and arithmetic.divide".to_owned()),
-        }),
-    }
+    evaluate_compute_request(request)
 }
 
 fn invalid_input(message: impl Into<String>, error: impl std::error::Error) -> ComputeError {
@@ -329,6 +287,34 @@ mod tests {
             response["result"]["metadata"]["precision"]["rounding"],
             "half-away-from-zero"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn computes_finance_request_through_generic_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "finance.loan-payment",
+            "input": {
+                "principal": {"kind": "integer", "value": "1000"},
+                "periodicRate": {"kind": "decimal", "value": "0.01", "scale": 2},
+                "periods": 12
+            },
+            "precision": {
+                "decimalPlaces": 2,
+                "rounding": "half-away-from-zero"
+            }
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "finance.loan-payment");
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "decimal", "value": "88.85", "scale": 2})
+        );
+        assert_eq!(response["result"]["details"]["basis"], "displayed-payment");
         Ok(())
     }
 

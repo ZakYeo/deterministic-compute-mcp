@@ -2,15 +2,12 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ArithmeticToolInput } from "./schemas.js";
+import type { ArithmeticToolInput, FinanceToolInput } from "./schemas.js";
 
 export type ComputeRequest = {
   operation: string;
-  input: {
-    left: ArithmeticToolInput["operands"][0];
-    right: ArithmeticToolInput["operands"][1];
-  };
-  precision?: ArithmeticToolInput["precision"];
+  input: Record<string, unknown>;
+  precision?: ArithmeticToolInput["precision"] | FinanceToolInput["precision"];
   trace: boolean;
 };
 
@@ -81,6 +78,21 @@ export function buildArithmeticRequest(input: ArithmeticToolInput): ComputeReque
 
   if (input.precision) {
     request.precision = input.precision;
+  }
+
+  return request;
+}
+
+export function buildFinanceRequest(input: FinanceToolInput): ComputeRequest {
+  const { operation, precision, trace, ...financeInput } = input;
+  const request: ComputeRequest = {
+    operation: `finance.${operation}`,
+    input: financeInput,
+    trace: trace ?? false,
+  };
+
+  if (precision) {
+    request.precision = precision;
   }
 
   return request;

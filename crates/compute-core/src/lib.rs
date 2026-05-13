@@ -12,6 +12,7 @@ use std::fmt;
 use std::str::FromStr;
 
 pub mod expression;
+pub mod finance;
 mod precision;
 pub mod units;
 
@@ -92,6 +93,8 @@ pub struct ComputeResult {
     pub operation: String,
     pub value: NumericValue,
     pub metadata: ResultMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
 }
 
 /// Stable metadata emitted with deterministic results.
@@ -102,6 +105,8 @@ pub struct ResultMetadata {
     pub numeric_kind: NumericKind,
     pub precision: PrecisionPolicy,
     pub deterministic: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assumptions: Vec<String>,
 }
 
 /// Diagnostic severity for non-fatal messages.
@@ -565,7 +570,9 @@ pub fn compute_binary(
                     numeric_kind: value.numeric_kind(),
                     precision,
                     deterministic: true,
+                    assumptions: Vec::new(),
                 },
+                details: None,
             };
             let trace = include_trace.then(|| {
                 vec![TraceStep {
@@ -579,6 +586,437 @@ pub fn compute_binary(
             ComputeResponse::success(result, trace)
         }
         Err(error) => ComputeResponse::failure(error, None),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BinaryInput {
+    left: NumericValue,
+    right: NumericValue,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExpressionInput {
+    expression: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SimpleInterestInput {
+    principal: NumericValue,
+    periodic_rate: NumericValue,
+    periods: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LoanPaymentInput {
+    principal: NumericValue,
+    periodic_rate: NumericValue,
+    periods: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PercentageChangeInput {
+    old_value: NumericValue,
+    new_value: NumericValue,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarginMarkupInput {
+    cost: NumericValue,
+    revenue: NumericValue,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CagrInput {
+    beginning_value: NumericValue,
+    ending_value: NumericValue,
+    periods: u32,
+}
+
+/// Evaluates a generic compute request through the core operation dispatcher.
+pub fn evaluate_compute_request(request: ComputeRequest) -> ComputeResponse {
+    let precision = request.precision.unwrap_or_default();
+
+    match request.operation.as_str() {
+        "arithmetic.add" => evaluate_binary_request(
+            ArithmeticOperation::Add,
+            request.input,
+            precision,
+            request.trace,
+        ),
+        "arithmetic.subtract" => evaluate_binary_request(
+            ArithmeticOperation::Subtract,
+            request.input,
+            precision,
+            request.trace,
+        ),
+        "arithmetic.multiply" => evaluate_binary_request(
+            ArithmeticOperation::Multiply,
+            request.input,
+            precision,
+            request.trace,
+        ),
+        "arithmetic.divide" => evaluate_binary_request(
+            ArithmeticOperation::Divide,
+            request.input,
+            precision,
+            request.trace,
+        ),
+        "expression.evaluate" => evaluate_expression_request(request.input, precision, request.trace),
+        "finance.simple-interest" => {
+            evaluate_simple_interest_request(request.input, precision, request.trace)
+        }
+        "finance.compound-interest" => {
+            evaluate_compound_interest_request(request.input, precision, request.trace)
+        }
+        "finance.loan-payment" => evaluate_loan_payment_request(request.input, precision, request.trace),
+        "finance.percentage-change" => {
+            evaluate_percentage_change_request(request.input, precision, request.trace)
+        }
+        "finance.margin-markup" => {
+            evaluate_margin_markup_request(request.input, precision, request.trace)
+        }
+        "finance.cagr" => evaluate_cagr_request(request.input, precision, request.trace),
+        operation => ComputeResponse::failure(
+            ComputeError {
+                code: ErrorCode::InvalidInput,
+                message: format!("unsupported operation: {operation}"),
+                detail: Some("supported operations are arithmetic.add, arithmetic.subtract, arithmetic.multiply, arithmetic.divide, expression.evaluate, finance.simple-interest, finance.compound-interest, finance.loan-payment, finance.percentage-change, finance.margin-markup, and finance.cagr".to_owned()),
+            },
+            None,
+        ),
+    }
+}
+
+fn evaluate_binary_request(
+    operation: ArithmeticOperation,
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<BinaryInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid arithmetic input", error),
+                None,
+            )
+        }
+    };
+    let left = match input.left.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let right = match input.right.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    compute_binary(operation, left, right, precision, include_trace)
+}
+
+fn evaluate_expression_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<ExpressionInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid expression input", error),
+                None,
+            )
+        }
+    };
+    expression::evaluate_expression(&input.expression, precision, include_trace)
+}
+
+fn evaluate_simple_interest_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<SimpleInterestInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid simple interest input", error),
+                None,
+            )
+        }
+    };
+    let principal = match input.principal.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let periodic_rate = match input.periodic_rate.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::simple_interest(
+        principal,
+        periodic_rate,
+        input.periods,
+        precision,
+        include_trace,
+    )
+    .map(finance_calculation_response)
+    .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_compound_interest_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<SimpleInterestInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid compound interest input", error),
+                None,
+            )
+        }
+    };
+    let principal = match input.principal.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let periodic_rate = match input.periodic_rate.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::compound_future_value(
+        principal,
+        periodic_rate,
+        input.periods,
+        precision,
+        include_trace,
+    )
+    .map(finance_calculation_response)
+    .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_loan_payment_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<LoanPaymentInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid loan payment input", error),
+                None,
+            )
+        }
+    };
+    let principal = match input.principal.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let periodic_rate = match input.periodic_rate.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::loan_payment(
+        principal,
+        periodic_rate,
+        input.periods,
+        precision,
+        include_trace,
+    )
+    .map(loan_payment_response)
+    .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_percentage_change_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<PercentageChangeInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid percentage change input", error),
+                None,
+            )
+        }
+    };
+    let old_value = match input.old_value.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let new_value = match input.new_value.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::percentage_change(old_value, new_value, precision, include_trace)
+        .map(finance_calculation_response)
+        .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_margin_markup_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<MarginMarkupInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid margin markup input", error),
+                None,
+            )
+        }
+    };
+    let cost = match input.cost.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let revenue = match input.revenue.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::margin_markup(cost, revenue, precision, include_trace)
+        .map(margin_markup_response)
+        .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn evaluate_cagr_request(
+    input: Value,
+    precision: PrecisionPolicy,
+    include_trace: bool,
+) -> ComputeResponse {
+    let input = match serde_json::from_value::<CagrInput>(input) {
+        Ok(input) => input,
+        Err(error) => {
+            return ComputeResponse::failure(
+                invalid_request_input("invalid CAGR input", error),
+                None,
+            )
+        }
+    };
+    let beginning_value = match input.beginning_value.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+    let ending_value = match input.ending_value.parse_number() {
+        Ok(number) => number,
+        Err(error) => return ComputeResponse::failure(error, None),
+    };
+
+    finance::cagr(
+        beginning_value,
+        ending_value,
+        input.periods,
+        precision,
+        include_trace,
+    )
+    .map(finance_calculation_response)
+    .unwrap_or_else(|error| ComputeResponse::failure(error, None))
+}
+
+fn finance_calculation_response(result: finance::FinanceCalculationResult) -> ComputeResponse {
+    let value = result.value.clone();
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value,
+            metadata: finance_metadata_to_result_metadata(result.metadata, result.value),
+            details: None,
+        },
+        finance_trace_to_core_trace(result.trace),
+    )
+}
+
+fn loan_payment_response(result: finance::LoanPaymentResult) -> ComputeResponse {
+    let payment = result.payment.clone();
+    let details = serde_json::to_value(&result.summary).ok();
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value: payment,
+            metadata: finance_metadata_to_result_metadata(result.metadata, result.payment),
+            details,
+        },
+        finance_trace_to_core_trace(result.trace),
+    )
+}
+
+fn margin_markup_response(result: finance::MarginMarkupResult) -> ComputeResponse {
+    let margin = result.margin.clone();
+    let details = serde_json::json!({
+        "markup": result.markup,
+    });
+    ComputeResponse::success(
+        ComputeResult {
+            operation: result.operation,
+            value: margin,
+            metadata: finance_metadata_to_result_metadata(result.metadata, result.margin),
+            details: Some(details),
+        },
+        finance_trace_to_core_trace(result.trace),
+    )
+}
+
+fn finance_metadata_to_result_metadata(
+    metadata: finance::FinanceMetadata,
+    value: NumericValue,
+) -> ResultMetadata {
+    ResultMetadata {
+        engine_version: metadata.engine_version,
+        numeric_kind: numeric_value_kind(&value),
+        precision: metadata.precision,
+        deterministic: metadata.deterministic,
+        assumptions: metadata.assumptions,
+    }
+}
+
+fn finance_trace_to_core_trace(trace: Vec<finance::FinanceTraceStep>) -> Option<Vec<TraceStep>> {
+    (!trace.is_empty()).then(|| {
+        trace
+            .into_iter()
+            .map(|step| TraceStep {
+                step: step.step,
+                operation: step.operation,
+                inputs: step.inputs,
+                output: step.output,
+                note: step.note,
+            })
+            .collect()
+    })
+}
+
+fn numeric_value_kind(value: &NumericValue) -> NumericKind {
+    match value {
+        NumericValue::Integer { .. } => NumericKind::Integer,
+        NumericValue::Decimal { .. } => NumericKind::Decimal,
+    }
+}
+
+fn invalid_request_input(
+    message: impl Into<String>,
+    error: impl std::error::Error,
+) -> ComputeError {
+    ComputeError {
+        code: ErrorCode::InvalidInput,
+        message: message.into(),
+        detail: Some(error.to_string()),
     }
 }
 
@@ -998,8 +1436,8 @@ pub fn version() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        add, binary_arithmetic, compute_binary, divide, engine_status, version,
-        ArithmeticOperation, ComputeRequest, Decimal, EngineStatus, ErrorCode, Number,
+        add, binary_arithmetic, compute_binary, divide, engine_status, evaluate_compute_request,
+        version, ArithmeticOperation, ComputeRequest, Decimal, EngineStatus, ErrorCode, Number,
         NumericValue, PrecisionPolicy, RoundingMode,
     };
     use serde_json::json;
@@ -1468,5 +1906,86 @@ mod tests {
             ))
         );
         assert_eq!(response.trace.map(|trace| trace.len()), Some(1));
+    }
+
+    #[test]
+    fn dispatches_finance_request_with_details_and_assumptions() -> serde_json::Result<()> {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "finance.loan-payment".to_owned(),
+            input: json!({
+                "principal": {"kind": "integer", "value": "1000"},
+                "periodicRate": {"kind": "decimal", "value": "0.01", "scale": 2},
+                "periods": 12
+            }),
+            precision: Some(PrecisionPolicy {
+                decimal_places: Some(2),
+                rounding: RoundingMode::HalfAwayFromZero,
+            }),
+            trace: true,
+        });
+        let response = serde_json::to_value(response)?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "finance.loan-payment");
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "decimal", "value": "88.85", "scale": 2})
+        );
+        assert_eq!(response["result"]["details"]["basis"], "displayed-payment");
+        assert_eq!(
+            response["result"]["details"]["totalPaid"],
+            json!({"kind": "decimal", "value": "1066.20", "scale": 2})
+        );
+        assert_eq!(
+            response["result"]["metadata"]["assumptions"][3],
+            "total_paid and total_interest are computed from the displayed payment"
+        );
+        assert_eq!(
+            response["trace"][0]["operation"],
+            "finance.loan-payment.formula"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dispatches_expression_request() -> serde_json::Result<()> {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "expression.evaluate".to_owned(),
+            input: json!({"expression": "2 * (3 + 4)"}),
+            precision: None,
+            trace: false,
+        });
+        let response = serde_json::to_value(response)?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "expression.evaluate");
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "integer", "value": "14"})
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn dispatches_non_exact_cagr_as_precision_error() {
+        let response = evaluate_compute_request(ComputeRequest {
+            operation: "finance.cagr".to_owned(),
+            input: json!({
+                "beginningValue": {"kind": "integer", "value": "100"},
+                "endingValue": {"kind": "integer", "value": "200"},
+                "periods": 2
+            }),
+            precision: Some(PrecisionPolicy {
+                decimal_places: Some(2),
+                rounding: RoundingMode::Exact,
+            }),
+            trace: false,
+        });
+
+        assert!(!response.ok);
+        assert_eq!(
+            response.error.map(|error| error.code),
+            Some(ErrorCode::PrecisionIssue)
+        );
     }
 }

@@ -56,7 +56,9 @@ pub fn evaluate_expression(
                     numeric_kind: value.numeric_kind(),
                     precision,
                     deterministic: true,
+                    assumptions: Vec::new(),
                 },
+                details: None,
             };
             ComputeResponse::success(result, include_trace.then_some(trace))
         }

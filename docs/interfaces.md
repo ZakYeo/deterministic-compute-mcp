@@ -32,3 +32,18 @@ Initial MCP tools are expected to map to stable compute domains:
 - `generate_expected_values`
 
 Tool names and schemas should be finalized by the TypeScript MCP server worker.
+
+## Finance Operations
+
+Implemented generic compute operations include:
+
+- `finance.simple-interest`
+- `finance.compound-interest`
+- `finance.loan-payment`
+- `finance.percentage-change`
+- `finance.margin-markup`
+- `finance.cagr`
+
+Finance rates are decimal rates per period, not percentage whole numbers. Loan payments assume fixed end-of-period payments and exclude fees, taxes, escrow, and prepayments. Loan `totalPaid` and `totalInterest` are computed from the displayed rounded payment and marked with `basis: "displayed-payment"`.
+
+`finance.cagr` intentionally supports only roots exactly representable at the requested `precision.decimalPlaces`; non-exact roots return a structured `precision-issue` error.

@@ -5,12 +5,15 @@ import { McpServer, StdioServerTransport } from "@modelcontextprotocol/server";
 import {
   arithmeticToolInputSchema,
   expressionToolInputSchema,
+  financeToolInputSchema,
   type ArithmeticToolInput,
   type ExpressionToolInput,
+  type FinanceToolInput,
 } from "./schemas.js";
 import {
   buildArithmeticToolResult,
   buildExpressionToolResult,
+  buildFinanceToolResult,
 } from "./tools.js";
 
 const server = new McpServer({
@@ -36,6 +39,16 @@ server.registerTool(
     inputSchema: expressionToolInputSchema,
   },
   async (input: ExpressionToolInput) => buildExpressionToolResult(input),
+);
+
+server.registerTool(
+  "calculate_finance",
+  {
+    description:
+      "Run deterministic finance and business calculators through the Rust compute CLI. CAGR supports only exact roots representable at the requested decimalPlaces.",
+    inputSchema: financeToolInputSchema,
+  },
+  async (input: FinanceToolInput) => buildFinanceToolResult(input),
 );
 
 const transport = new StdioServerTransport();

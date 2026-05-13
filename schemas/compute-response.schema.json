@@ -10,7 +10,7 @@
       "type": "boolean"
     },
     "result": {
-      "description": "Operation-specific deterministic result."
+      "description": "Operation-specific deterministic result. Finance responses use value as the primary numeric output and may include machine-readable details such as loan summary totals or markup."
     },
     "diagnostics": {
       "type": "array",
