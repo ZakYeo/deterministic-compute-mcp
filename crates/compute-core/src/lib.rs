@@ -13,6 +13,7 @@ use std::str::FromStr;
 
 pub mod expression;
 mod precision;
+pub mod units;
 
 use precision::MAX_DECIMAL_SCALE;
 
