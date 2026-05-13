@@ -217,9 +217,43 @@ Ownership note: the workstream expanded beyond `crates/compute-core/src/finance/
 - `npm --prefix apps/mcp-server-ts run build`: passed.
 - `npm --prefix apps/mcp-server-ts test`: passed with 14 MCP tests.
 
+## Verification Status
+
+Branch: `agent/verification`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 88/100, changes requested for public JSON schema definitions, MCP negative tolerance validation, and edge-case coverage.
+- Second review: 94/100, passed. Added a schema clarity note that `precision` is ignored for `verification.compare` before merge.
+
+The verification module now includes:
+
+- Public `verification.compare` operation for exact and tolerance-based numeric result verification.
+- Scale-normalized exact comparisons for JSON-safe integer and decimal values.
+- Absolute tolerance and relative tolerance using `abs(expected) * tolerance`.
+- Machine-readable comparison status, mode, pass/fail flag, expected/actual values, difference, and tolerance details.
+- Deterministic trace output with absolute difference as the generic result value.
+- Structured invalid-input and overflow errors for negative tolerances and unrepresentable differences.
+- Core generic request dispatch, Rust CLI support, MCP `verify_result` tool, and request builders.
+- Public JSON schema definitions for verification input, tolerance variants, details, statuses, modes, and tolerance metadata.
+- Tests for exact matches/mismatches, decimal scale normalization, tolerance pass/fail, zero/negative expected relative tolerance, exact equality with tolerance, overflow, CLI dispatch, MCP mapping, and schema contract coverage.
+
+Ownership note: the workstream expanded beyond `crates/compute-core/src/verification/**` to expose the public operation through core dispatch, CLI, MCP, schemas, and interface docs.
+
+## Verification Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 104 `compute-core` tests and 15 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
+- `npm --prefix apps/mcp-server-ts run typecheck`: passed.
+- `npm --prefix apps/mcp-server-ts run build`: passed.
+- `npm --prefix apps/mcp-server-ts test`: passed with 19 MCP tests.
+
 ## Next Workstreams
 
-- `agent/verification`: add exact and tolerance-based result comparison.
 - `agent/test-generation`: add deterministic expected-value generation.
 - `agent/docs`: expand installation, usage, and integration docs.
 
