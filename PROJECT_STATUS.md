@@ -252,9 +252,44 @@ Ownership note: the workstream expanded beyond `crates/compute-core/src/verifica
 - `npm --prefix apps/mcp-server-ts run build`: passed.
 - `npm --prefix apps/mcp-server-ts test`: passed with 19 MCP tests.
 
+## Test Generation Status
+
+Branch: `agent/test-generation`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 88/100, changes requested for structured fail-fast detail, size bounds, richer trace metadata, schema-contract tests, and documentation language.
+- Second review: 93/100, passed. Added an MCP recursion schema regression test before merge.
+
+The test generation module now includes:
+
+- Public `test-generation.generate-expected-values` operation for deterministic expected-value generation.
+- Explicit bounded case arrays evaluated in input order without randomness.
+- Reuse of the core compute dispatcher for arithmetic, expression, finance, and verification behavior.
+- Full per-case normalized request and deterministic compute response in `result.details.cases`.
+- `failOnCaseError` support with structured JSON detail containing case id, index, operation, nested error, nested response, and generated case count.
+- Hard bounds for max cases, case id byte length, and serialized case input size.
+- Recursive generation case rejection in Rust and MCP schema boundaries.
+- Optional trace metadata with per-case id/index/operation/status plus summary evaluated and failed counts.
+- Core dispatch, Rust CLI support, MCP `generate_expected_values` tool, public schemas, docs, and example request coverage.
+- Tests for repeatability, expression generation, recorded case failures, fail-fast detail, max case boundaries, size bounds, trace metadata, CLI dispatch, MCP mapping, recursion rejection, and schema contract coverage.
+
+Ownership note: the workstream expanded beyond `crates/compute-core/src/test_generation/**` to expose the public operation through core dispatch, CLI, MCP, schemas, docs, and examples. Shared `TraceStep` gained optional metadata for higher-level operation traces.
+
+## Test Generation Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 113 `compute-core` tests and 17 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
+- `npm --prefix apps/mcp-server-ts run typecheck`: passed.
+- `npm --prefix apps/mcp-server-ts run build`: passed.
+- `npm --prefix apps/mcp-server-ts test`: passed with 24 MCP tests.
+
 ## Next Workstreams
 
-- `agent/test-generation`: add deterministic expected-value generation.
 - `agent/docs`: expand installation, usage, and integration docs.
 
 ## Coordination Notes
