@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   buildArithmeticRequest,
@@ -24,6 +25,7 @@ import {
   verificationToolInputSchema,
 } from "./schemas.js";
 import {
+  buildArithmeticToolResult,
   buildExpressionToolResult,
   buildFinanceToolResult,
   buildTestGenerationToolResult,
@@ -32,6 +34,8 @@ import {
   buildVerificationToolResult,
   type ToolPayload,
 } from "./tools.js";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 test("arithmetic schema accepts deterministic decimal operands", () => {
   const parsed = arithmeticToolInputSchema.parse({
@@ -260,13 +264,13 @@ test("verification schema rejects negative tolerance values", () => {
 test("public JSON schemas define verification compare contract", () => {
   const requestSchema = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), "../../schemas/compute-request.schema.json"),
+      path.join(repoRoot, "schemas/compute-request.schema.json"),
       "utf8",
     ),
   );
   const responseSchema = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), "../../schemas/compute-response.schema.json"),
+      path.join(repoRoot, "schemas/compute-response.schema.json"),
       "utf8",
     ),
   );
@@ -310,13 +314,13 @@ test("public JSON schemas define verification compare contract", () => {
 test("public JSON schemas define expected-value generation contract", () => {
   const requestSchema = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), "../../schemas/compute-request.schema.json"),
+      path.join(repoRoot, "schemas/compute-request.schema.json"),
       "utf8",
     ),
   );
   const responseSchema = JSON.parse(
     fs.readFileSync(
-      path.join(process.cwd(), "../../schemas/compute-response.schema.json"),
+      path.join(repoRoot, "schemas/compute-response.schema.json"),
       "utf8",
     ),
   );
@@ -547,6 +551,18 @@ test("buildExpressionRequest maps MCP input to compute CLI request", () => {
 
 test("new MCP tool handlers invoke the real compute CLI", async () => {
   const commandConfig = resolveCliCommand();
+  const arithmetic = (await buildArithmeticToolResult(
+    {
+      operation: "add",
+      operands: [
+        { kind: "integer", value: "20" },
+        { kind: "integer", value: "22" },
+      ],
+      trace: false,
+    },
+    runProcess,
+    commandConfig,
+  )).structuredContent as ToolPayload;
   const expression = (await buildExpressionToolResult(
     { expression: "(2 + 3) * 4", trace: false },
     runProcess,
@@ -557,6 +573,18 @@ test("new MCP tool handlers invoke the real compute CLI", async () => {
       value: { kind: "integer", value: "100" },
       sourceUnit: "cm",
       targetUnit: "m",
+      precision: { decimalPlaces: 2, rounding: "exact" },
+      trace: false,
+    },
+    runProcess,
+    commandConfig,
+  )).structuredContent as ToolPayload;
+  const compoundInterest = (await buildFinanceToolResult(
+    {
+      operation: "compound-interest",
+      principal: { kind: "integer", value: "1000" },
+      periodicRate: { kind: "decimal", value: "0.05", scale: 2 },
+      periods: 2,
       precision: { decimalPlaces: 2, rounding: "exact" },
       trace: false,
     },
@@ -574,11 +602,21 @@ test("new MCP tool handlers invoke the real compute CLI", async () => {
     runProcess,
     commandConfig,
   )).structuredContent as ToolPayload;
+  const arithmeticResult = (arithmetic.response as { result?: { value?: unknown } })
+    .result;
   const expressionResult = (expression.response as { result?: { value?: unknown } })
     .result;
   const unitsResult = (units.response as { result?: { value?: unknown } }).result;
+  const compoundInterestResult = (
+    compoundInterest.response as { result?: { value?: unknown } }
+  ).result;
   const vatResult = (vat.response as { result?: { value?: unknown } }).result;
 
+  assert.equal(arithmetic.response.ok, true, JSON.stringify(arithmetic.response));
+  assert.deepEqual(arithmeticResult?.value, {
+    kind: "integer",
+    value: "42",
+  });
   assert.equal(expression.response.ok, true);
   assert.deepEqual(expressionResult?.value, {
     kind: "integer",
@@ -588,6 +626,12 @@ test("new MCP tool handlers invoke the real compute CLI", async () => {
   assert.deepEqual(unitsResult?.value, {
     kind: "decimal",
     value: "1.00",
+    scale: 2,
+  });
+  assert.equal(compoundInterest.response.ok, true);
+  assert.deepEqual(compoundInterestResult?.value, {
+    kind: "decimal",
+    value: "1102.50",
     scale: 2,
   });
   assert.equal(vat.response.ok, true);
@@ -921,7 +965,7 @@ test("resolveCliCommand uses configurable command and JSON args", () => {
 });
 
 test("example JSON files are valid", () => {
-  const examplesDir = path.join(process.cwd(), "../../examples");
+  const examplesDir = path.join(repoRoot, "examples");
   for (const fileName of fs.readdirSync(examplesDir)) {
     if (fileName.endsWith(".json")) {
       assert.doesNotThrow(() =>

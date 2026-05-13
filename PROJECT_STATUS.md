@@ -337,25 +337,29 @@ The integration fixes workstream closes the MVP audit gaps:
 
 ## Final Integration Audit
 
-Status: superseded; final audit will be rerun after integration fixes merge
+Status: complete
+
+Final integration review: 93/100, approved.
 
 Final audit findings:
 
-- Corrected stale MCP `compute_expression` placeholder wording so it accurately says the MCP wrapper is not wired through, rather than claiming the Rust CLI lacks expression support.
 - Confirmed all listed workstreams are complete, reviewed at or above the required score, merged, and status-documented.
+- Confirmed MCP runtime dependency `@cfworker/json-schema` is declared so the built stdio server starts successfully.
+- Confirmed MCP real CLI-backed tests cover arithmetic calculate, expression evaluation, unit conversion, VAT, and compound interest.
 - Confirmed working examples parse as JSON and runnable request examples execute successfully through the Rust CLI.
 
 Final audit checks:
 
 - `cargo fmt --all -- --check`: passed.
 - `cargo check --workspace`: passed.
-- `cargo test --workspace`: passed with 113 `compute-core` tests and 17 `compute-cli` tests.
+- `cargo test --workspace`: passed with 119 `compute-core` tests and 20 `compute-cli` tests.
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
 - `npm --prefix apps/mcp-server-ts run typecheck`: passed.
 - `npm --prefix apps/mcp-server-ts run build`: passed.
-- `npm --prefix apps/mcp-server-ts test`: passed with 24 MCP tests.
+- `npm --prefix apps/mcp-server-ts test`: passed.
+- `node apps/mcp-server-ts/dist/index.js`: passed; built MCP stdio entrypoint starts and exits cleanly when stdin closes.
 - Example JSON parsing for all `examples/*.json`: passed.
-- CLI execution for arithmetic, expression, finance, verification, and expected-value generation request examples: passed.
+- CLI execution for arithmetic, expression, unit conversion, VAT, finance, verification, and expected-value generation request examples: passed.
 - `git diff --check`: passed.
 
 ## Coordination Notes

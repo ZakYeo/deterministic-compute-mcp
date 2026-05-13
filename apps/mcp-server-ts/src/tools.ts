@@ -48,9 +48,11 @@ export function buildToolResult(payload: ToolPayload): CallToolResult {
 
 export async function buildArithmeticToolResult(
   input: ArithmeticToolInput,
+  runner?: ProcessRunner,
+  commandConfig?: CliCommand,
 ): Promise<CallToolResult> {
   const request = buildArithmeticRequest(input);
-  const response = await invokeComputeCli(request);
+  const response = await invokeComputeCli(request, runner, commandConfig);
 
   return buildToolResult({
     tool: "compute_arithmetic",
