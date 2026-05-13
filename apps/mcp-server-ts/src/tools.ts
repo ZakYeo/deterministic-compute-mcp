@@ -2,14 +2,21 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
 
 import {
   buildArithmeticRequest,
+  buildFinanceRequest,
   invokeComputeCli,
+  type CliCommand,
   type CliResult,
   type ComputeRequest,
+  type ProcessRunner,
 } from "./cli.js";
-import type { ArithmeticToolInput, ExpressionToolInput } from "./schemas.js";
+import type {
+  ArithmeticToolInput,
+  ExpressionToolInput,
+  FinanceToolInput,
+} from "./schemas.js";
 
 export type ToolPayload = {
-  tool: "compute_arithmetic" | "compute_expression";
+  tool: "compute_arithmetic" | "compute_expression" | "calculate_finance";
   request: ComputeRequest | ExpressionComputeRequest;
   response: CliResult | ExpressionFailure;
 };
@@ -52,6 +59,21 @@ export async function buildArithmeticToolResult(
 
   return buildToolResult({
     tool: "compute_arithmetic",
+    request,
+    response,
+  });
+}
+
+export async function buildFinanceToolResult(
+  input: FinanceToolInput,
+  runner?: ProcessRunner,
+  commandConfig?: CliCommand,
+): Promise<CallToolResult> {
+  const request = buildFinanceRequest(input);
+  const response = await invokeComputeCli(request, runner, commandConfig);
+
+  return buildToolResult({
+    tool: "calculate_finance",
     request,
     response,
   });

@@ -21,6 +21,20 @@ export const precisionPolicySchema = z
   })
   .strict();
 
+const cagrPrecisionPolicySchema = z
+  .object({
+    decimalPlaces: z
+      .number()
+      .int()
+      .min(0)
+      .max(38)
+      .describe("Required fractional decimal places for the CAGR output."),
+    rounding: roundingModeSchema
+      .default("exact")
+      .describe("Deterministic rounding policy."),
+  })
+  .strict();
+
 export const numericValueSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -74,5 +88,77 @@ export const expressionToolInputSchema = z
   })
   .strict();
 
+const financeCommonFields = {
+  precision: precisionPolicySchema.optional(),
+  trace: z
+    .boolean()
+    .default(false)
+    .describe("Whether to request deterministic trace metadata."),
+};
+
+export const financeToolInputSchema = z.discriminatedUnion("operation", [
+  z
+    .object({
+      operation: z.literal("simple-interest"),
+      principal: numericValueSchema,
+      periodicRate: numericValueSchema.describe(
+        "Decimal rate per period, not a percentage whole number.",
+      ),
+      periods: z.number().int().min(0),
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("compound-interest"),
+      principal: numericValueSchema,
+      periodicRate: numericValueSchema.describe("Decimal rate per compounding period."),
+      periods: z.number().int().min(0),
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("loan-payment"),
+      principal: numericValueSchema,
+      periodicRate: numericValueSchema.describe("Decimal rate per payment period."),
+      periods: z.number().int().min(1),
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("percentage-change"),
+      oldValue: numericValueSchema,
+      newValue: numericValueSchema,
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("margin-markup"),
+      cost: numericValueSchema,
+      revenue: numericValueSchema,
+      ...financeCommonFields,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("cagr"),
+      beginningValue: numericValueSchema,
+      endingValue: numericValueSchema,
+      periods: z.number().int().min(1),
+      precision: cagrPrecisionPolicySchema.describe(
+        "Required. CAGR supports only exact roots representable at decimalPlaces; non-exact roots return precision errors.",
+      ),
+      trace: z
+        .boolean()
+        .default(false)
+        .describe("Whether to request deterministic trace metadata."),
+    })
+    .strict(),
+]);
+
 export type ArithmeticToolInput = z.infer<typeof arithmeticToolInputSchema>;
 export type ExpressionToolInput = z.infer<typeof expressionToolInputSchema>;
+export type FinanceToolInput = z.infer<typeof financeToolInputSchema>;

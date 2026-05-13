@@ -1,11 +1,20 @@
 {
-  "operation": "expression.evaluate",
+  "operation": "finance.loan-payment",
   "input": {
-    "expression": "2 + 2"
+    "principal": {
+      "kind": "integer",
+      "value": "1000"
+    },
+    "periodicRate": {
+      "kind": "decimal",
+      "value": "0.01",
+      "scale": 2
+    },
+    "periods": 12
   },
   "precision": {
-    "decimalPlaces": 0,
-    "rounding": "exact"
+    "decimalPlaces": 2,
+    "rounding": "half-away-from-zero"
   },
   "trace": true
 }

@@ -3,14 +3,16 @@ import test from "node:test";
 
 import {
   buildArithmeticRequest,
+  buildFinanceRequest,
   invokeComputeCli,
   resolveCliCommand,
   runProcess,
   type ProcessRunner,
 } from "./cli.js";
-import { arithmeticToolInputSchema } from "./schemas.js";
+import { arithmeticToolInputSchema, financeToolInputSchema } from "./schemas.js";
 import {
   buildExpressionToolResult,
+  buildFinanceToolResult,
   buildToolResult,
   type ToolPayload,
 } from "./tools.js";
@@ -71,6 +73,50 @@ test("buildArithmeticRequest maps MCP input to compute CLI request", () => {
   });
 });
 
+test("finance schema documents exact CAGR precision contract", () => {
+  const parsed = financeToolInputSchema.parse({
+    operation: "cagr",
+    beginningValue: { kind: "integer", value: "100" },
+    endingValue: { kind: "integer", value: "121" },
+    periods: 2,
+    precision: { decimalPlaces: 2, rounding: "exact" },
+    trace: true,
+  });
+
+  assert.equal(parsed.operation, "cagr");
+  assert.throws(() =>
+    financeToolInputSchema.parse({
+      operation: "cagr",
+      beginningValue: { kind: "integer", value: "100" },
+      endingValue: { kind: "integer", value: "121" },
+      periods: 2,
+      precision: { rounding: "exact" },
+    }),
+  );
+});
+
+test("buildFinanceRequest maps MCP input to compute CLI request", () => {
+  const request = buildFinanceRequest({
+    operation: "loan-payment",
+    principal: { kind: "integer", value: "1000" },
+    periodicRate: { kind: "decimal", value: "0.01", scale: 2 },
+    periods: 12,
+    precision: { decimalPlaces: 2, rounding: "half-away-from-zero" },
+    trace: false,
+  });
+
+  assert.deepEqual(request, {
+    operation: "finance.loan-payment",
+    input: {
+      principal: { kind: "integer", value: "1000" },
+      periodicRate: { kind: "decimal", value: "0.01", scale: 2 },
+      periods: 12,
+    },
+    precision: { decimalPlaces: 2, rounding: "half-away-from-zero" },
+    trace: false,
+  });
+});
+
 test("buildToolResult returns matching structuredContent and JSON text content", () => {
   const payload = {
     tool: "compute_arithmetic" as const,
@@ -101,6 +147,40 @@ test("buildExpressionToolResult returns a structured not-implemented response", 
   assert.equal(structuredContent.tool, "compute_expression");
   assert.equal(structuredContent.response.ok, false);
   assert.equal(structuredContent.response.error?.code, "not-implemented");
+});
+
+test("buildFinanceToolResult invokes compute CLI with finance request", async () => {
+  let capturedInput = "";
+  const runner: ProcessRunner = async (_command, _args, input) => {
+    capturedInput = input;
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        result: { operation: JSON.parse(input).operation },
+        version: "0.1.0",
+      }),
+      stderr: "",
+    };
+  };
+
+  const result = await buildFinanceToolResult(
+    {
+      operation: "simple-interest",
+      principal: { kind: "integer", value: "1000" },
+      periodicRate: { kind: "decimal", value: "0.05", scale: 2 },
+      periods: 3,
+      trace: false,
+    },
+    runner,
+    { command: "compute-cli", args: [] },
+  );
+  const structuredContent = result.structuredContent as ToolPayload;
+
+  assert.equal(structuredContent.tool, "calculate_finance");
+  assert.equal(structuredContent.request.operation, "finance.simple-interest");
+  assert.match(capturedInput, /"operation":"finance.simple-interest"/);
+  assert.equal(structuredContent.response.ok, true);
 });
 
 test("invokeComputeCli sends JSON request to configured runner", async () => {
