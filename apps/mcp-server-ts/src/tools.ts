@@ -1,0 +1,87 @@
+import type { CallToolResult } from "@modelcontextprotocol/server";
+
+import {
+  buildArithmeticRequest,
+  invokeComputeCli,
+  type CliResult,
+  type ComputeRequest,
+} from "./cli.js";
+import type { ArithmeticToolInput, ExpressionToolInput } from "./schemas.js";
+
+export type ToolPayload = {
+  tool: "compute_arithmetic" | "compute_expression";
+  request: ComputeRequest | ExpressionComputeRequest;
+  response: CliResult | ExpressionFailure;
+};
+
+export type ExpressionFailure = {
+  ok: false;
+  error: {
+    code: "not-implemented";
+    message: string;
+  };
+  version: "mcp-wrapper";
+};
+
+export type ExpressionComputeRequest = {
+  operation: "expression.evaluate";
+  input: {
+    expression: string;
+  };
+  precision?: ExpressionToolInput["precision"];
+  trace: boolean;
+};
+
+export function buildToolResult(payload: ToolPayload): CallToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(payload, null, 2),
+      },
+    ],
+    structuredContent: payload,
+  };
+}
+
+export async function buildArithmeticToolResult(
+  input: ArithmeticToolInput,
+): Promise<CallToolResult> {
+  const request = buildArithmeticRequest(input);
+  const response = await invokeComputeCli(request);
+
+  return buildToolResult({
+    tool: "compute_arithmetic",
+    request,
+    response,
+  });
+}
+
+export function buildExpressionToolResult(
+  input: ExpressionToolInput,
+): CallToolResult {
+  const request: ExpressionComputeRequest = {
+    operation: "expression.evaluate",
+    input: {
+      expression: input.expression,
+    },
+    trace: input.trace ?? false,
+  };
+
+  if (input.precision) {
+    request.precision = input.precision;
+  }
+
+  return buildToolResult({
+    tool: "compute_expression",
+    request,
+    response: {
+      ok: false,
+      error: {
+        code: "not-implemented",
+        message: "expression.evaluate is not implemented by the current Rust CLI",
+      },
+      version: "mcp-wrapper",
+    },
+  });
+}
