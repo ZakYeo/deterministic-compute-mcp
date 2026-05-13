@@ -6,16 +6,19 @@ import {
   arithmeticToolInputSchema,
   expressionToolInputSchema,
   financeToolInputSchema,
+  testGenerationToolInputSchema,
   verificationToolInputSchema,
   type ArithmeticToolInput,
   type ExpressionToolInput,
   type FinanceToolInput,
+  type TestGenerationToolInput,
   type VerificationToolInput,
 } from "./schemas.js";
 import {
   buildArithmeticToolResult,
   buildExpressionToolResult,
   buildFinanceToolResult,
+  buildTestGenerationToolResult,
   buildVerificationToolResult,
 } from "./tools.js";
 
@@ -62,6 +65,16 @@ server.registerTool(
     inputSchema: verificationToolInputSchema,
   },
   async (input: VerificationToolInput) => buildVerificationToolResult(input),
+);
+
+server.registerTool(
+  "generate_expected_values",
+  {
+    description:
+      "Generate deterministic expected values for supported numeric compute operations through the Rust compute CLI.",
+    inputSchema: testGenerationToolInputSchema,
+  },
+  async (input: TestGenerationToolInput) => buildTestGenerationToolResult(input),
 );
 
 const transport = new StdioServerTransport();

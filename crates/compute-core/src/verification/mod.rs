@@ -165,6 +165,7 @@ pub fn compare(
             inputs: vec![expected_value.clone(), actual_value.clone()],
             output: Some(difference_value.clone()),
             note: "deterministic numeric verification comparison".to_owned(),
+            metadata: None,
         }]
     });
 

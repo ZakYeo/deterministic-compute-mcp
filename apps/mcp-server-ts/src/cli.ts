@@ -5,13 +5,17 @@ import { fileURLToPath } from "node:url";
 import type {
   ArithmeticToolInput,
   FinanceToolInput,
+  TestGenerationToolInput,
   VerificationToolInput,
 } from "./schemas.js";
 
 export type ComputeRequest = {
   operation: string;
   input: Record<string, unknown>;
-  precision?: ArithmeticToolInput["precision"] | FinanceToolInput["precision"];
+  precision?:
+    | ArithmeticToolInput["precision"]
+    | FinanceToolInput["precision"]
+    | TestGenerationToolInput["cases"][number]["precision"];
   trace: boolean;
 };
 
@@ -109,6 +113,17 @@ export function buildVerificationRequest(
   return {
     operation: "verification.compare",
     input: verificationInput,
+    trace: trace ?? false,
+  };
+}
+
+export function buildTestGenerationRequest(
+  input: TestGenerationToolInput,
+): ComputeRequest {
+  const { trace, ...generationInput } = input;
+  return {
+    operation: "test-generation.generate-expected-values",
+    input: generationInput,
     trace: trace ?? false,
   };
 }

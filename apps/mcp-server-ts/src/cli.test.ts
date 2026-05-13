@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   buildArithmeticRequest,
   buildFinanceRequest,
+  buildTestGenerationRequest,
   buildVerificationRequest,
   invokeComputeCli,
   resolveCliCommand,
@@ -15,11 +16,13 @@ import {
 import {
   arithmeticToolInputSchema,
   financeToolInputSchema,
+  testGenerationToolInputSchema,
   verificationToolInputSchema,
 } from "./schemas.js";
 import {
   buildExpressionToolResult,
   buildFinanceToolResult,
+  buildTestGenerationToolResult,
   buildToolResult,
   buildVerificationToolResult,
   type ToolPayload,
@@ -202,6 +205,66 @@ test("public JSON schemas define verification compare contract", () => {
   );
 });
 
+test("public JSON schemas define expected-value generation contract", () => {
+  const requestSchema = JSON.parse(
+    fs.readFileSync(
+      path.join(process.cwd(), "../../schemas/compute-request.schema.json"),
+      "utf8",
+    ),
+  );
+  const responseSchema = JSON.parse(
+    fs.readFileSync(
+      path.join(process.cwd(), "../../schemas/compute-response.schema.json"),
+      "utf8",
+    ),
+  );
+
+  assert.ok(requestSchema.$defs.GenerateExpectedValuesInput);
+  assert.ok(requestSchema.$defs.ExpectedValueCaseSpec);
+  assert.equal(
+    requestSchema.$defs.GenerateExpectedValuesInput.properties.cases.items.$ref,
+    "#/$defs/ExpectedValueCaseSpec",
+  );
+  assert.equal(
+    requestSchema.$defs.ExpectedValueCaseSpec.properties.id.maxLength,
+    128,
+  );
+  assert.equal(
+    requestSchema.$defs.GenerateExpectedValuesInput.properties.cases.maxItems,
+    100,
+  );
+  assert.deepEqual(
+    requestSchema.$defs.ExpectedValueCaseSpec.properties.operation.enum,
+    [
+      "arithmetic.add",
+      "arithmetic.subtract",
+      "arithmetic.multiply",
+      "arithmetic.divide",
+      "expression.evaluate",
+      "finance.simple-interest",
+      "finance.compound-interest",
+      "finance.loan-payment",
+      "finance.percentage-change",
+      "finance.margin-markup",
+      "finance.cagr",
+      "verification.compare",
+    ],
+  );
+  assert.ok(responseSchema.$defs.GeneratedExpectedValuesDetails);
+  assert.equal(
+    responseSchema.$defs.GeneratedExpectedValuesDetails.properties.cases.items.$ref,
+    "#/$defs/GeneratedExpectedValueCase",
+  );
+  assert.equal(
+    responseSchema.$defs.GeneratedExpectedValuesDetails.properties.caseCount.maximum,
+    100,
+  );
+  assert.equal(
+    responseSchema.$defs.TraceStep.properties.metadata.$ref,
+    "#/$defs/TraceMetadata",
+  );
+});
+
 test("buildVerificationRequest maps MCP input to compute CLI request", () => {
   const request = buildVerificationRequest({
     expected: { kind: "integer", value: "100" },
@@ -224,6 +287,115 @@ test("buildVerificationRequest maps MCP input to compute CLI request", () => {
       },
     },
     trace: false,
+  });
+});
+
+test("test generation schema accepts bounded deterministic cases", () => {
+  const parsed = testGenerationToolInputSchema.parse({
+    cases: [
+      {
+        id: "addition",
+        operation: "arithmetic.add",
+        input: {
+          left: { kind: "integer", value: "20" },
+          right: { kind: "integer", value: "22" },
+        },
+      },
+    ],
+    maxCases: 1,
+  });
+
+  assert.equal(parsed.trace, false);
+  assert.equal(parsed.failOnCaseError, false);
+  assert.equal(parsed.cases[0]?.trace, false);
+});
+
+test("test generation schema rejects case counts above maxCases", () => {
+  assert.throws(() =>
+    testGenerationToolInputSchema.parse({
+      maxCases: 1,
+      cases: [
+        { id: "a", operation: "arithmetic.add", input: {} },
+        { id: "b", operation: "arithmetic.add", input: {} },
+      ],
+    }),
+  );
+});
+
+test("test generation schema enforces id and serialized input bounds", () => {
+  assert.throws(() =>
+    testGenerationToolInputSchema.parse({
+      cases: [
+        {
+          id: "x".repeat(129),
+          operation: "arithmetic.add",
+          input: {},
+        },
+      ],
+    }),
+  );
+
+  assert.throws(() =>
+    testGenerationToolInputSchema.parse({
+      cases: [
+        {
+          id: "large-input",
+          operation: "expression.evaluate",
+          input: { expression: "x".repeat(16 * 1024) },
+        },
+      ],
+    }),
+  );
+});
+
+test("test generation schema rejects recursive generation cases", () => {
+  assert.throws(() =>
+    testGenerationToolInputSchema.parse({
+      cases: [
+        {
+          id: "recursive",
+          operation: "test-generation.generate-expected-values",
+          input: { cases: [] },
+        },
+      ],
+    }),
+  );
+});
+
+test("buildTestGenerationRequest maps MCP input to compute CLI request", () => {
+  const request = buildTestGenerationRequest({
+    cases: [
+      {
+        id: "addition",
+        operation: "arithmetic.add",
+        input: {
+          left: { kind: "integer", value: "20" },
+          right: { kind: "integer", value: "22" },
+        },
+        trace: false,
+      },
+    ],
+    failOnCaseError: false,
+    trace: true,
+  });
+
+  assert.deepEqual(request, {
+    operation: "test-generation.generate-expected-values",
+    input: {
+      cases: [
+        {
+          id: "addition",
+          operation: "arithmetic.add",
+          input: {
+            left: { kind: "integer", value: "20" },
+            right: { kind: "integer", value: "22" },
+          },
+          trace: false,
+        },
+      ],
+      failOnCaseError: false,
+    },
+    trace: true,
   });
 });
 
@@ -326,6 +498,51 @@ test("buildVerificationToolResult invokes compute CLI with verification request"
   assert.equal(structuredContent.tool, "verify_result");
   assert.equal(structuredContent.request.operation, "verification.compare");
   assert.match(capturedInput, /"operation":"verification.compare"/);
+  assert.equal(structuredContent.response.ok, true);
+});
+
+test("buildTestGenerationToolResult invokes compute CLI with generation request", async () => {
+  let capturedInput = "";
+  const runner: ProcessRunner = async (_command, _args, input) => {
+    capturedInput = input;
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        result: { operation: JSON.parse(input).operation },
+        version: "0.1.0",
+      }),
+      stderr: "",
+    };
+  };
+
+  const result = await buildTestGenerationToolResult(
+    {
+      cases: [
+        {
+          id: "addition",
+          operation: "arithmetic.add",
+          input: {
+            left: { kind: "integer", value: "20" },
+            right: { kind: "integer", value: "22" },
+          },
+          trace: false,
+        },
+      ],
+      failOnCaseError: false,
+      trace: false,
+    },
+    runner,
+    { command: "compute-cli", args: [] },
+  );
+  const structuredContent = result.structuredContent as ToolPayload;
+
+  assert.equal(structuredContent.tool, "generate_expected_values");
+  assert.equal(
+    structuredContent.request.operation,
+    "test-generation.generate-expected-values",
+  );
+  assert.match(capturedInput, /"operation":"test-generation.generate-expected-values"/);
   assert.equal(structuredContent.response.ok, true);
 });
 

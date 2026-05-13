@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/server";
 import {
   buildArithmeticRequest,
   buildFinanceRequest,
+  buildTestGenerationRequest,
   buildVerificationRequest,
   invokeComputeCli,
   type CliCommand,
@@ -14,6 +15,7 @@ import type {
   ArithmeticToolInput,
   ExpressionToolInput,
   FinanceToolInput,
+  TestGenerationToolInput,
   VerificationToolInput,
 } from "./schemas.js";
 
@@ -22,6 +24,7 @@ export type ToolPayload = {
     | "compute_arithmetic"
     | "compute_expression"
     | "calculate_finance"
+    | "generate_expected_values"
     | "verify_result";
   request: ComputeRequest | ExpressionComputeRequest;
   response: CliResult | ExpressionFailure;
@@ -95,6 +98,21 @@ export async function buildVerificationToolResult(
 
   return buildToolResult({
     tool: "verify_result",
+    request,
+    response,
+  });
+}
+
+export async function buildTestGenerationToolResult(
+  input: TestGenerationToolInput,
+  runner?: ProcessRunner,
+  commandConfig?: CliCommand,
+): Promise<CallToolResult> {
+  const request = buildTestGenerationRequest(input);
+  const response = await invokeComputeCli(request, runner, commandConfig);
+
+  return buildToolResult({
+    tool: "generate_expected_values",
     request,
     response,
   });

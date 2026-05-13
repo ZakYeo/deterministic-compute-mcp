@@ -1,0 +1,42 @@
+{
+  "operation": "test-generation.generate-expected-values",
+  "input": {
+    "cases": [
+      {
+        "id": "integer-addition",
+        "operation": "arithmetic.add",
+        "input": {
+          "left": {
+            "kind": "integer",
+            "value": "20"
+          },
+          "right": {
+            "kind": "integer",
+            "value": "22"
+          }
+        }
+      },
+      {
+        "id": "rounded-division",
+        "operation": "arithmetic.divide",
+        "input": {
+          "left": {
+            "kind": "integer",
+            "value": "2"
+          },
+          "right": {
+            "kind": "integer",
+            "value": "3"
+          }
+        },
+        "precision": {
+          "decimalPlaces": 2,
+          "rounding": "half-away-from-zero"
+        }
+      }
+    ],
+    "failOnCaseError": false,
+    "maxCases": 100
+  },
+  "trace": true
+}
