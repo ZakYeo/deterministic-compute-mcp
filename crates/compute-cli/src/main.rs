@@ -24,6 +24,7 @@ Supported operations:
   finance.percentage-change
   finance.margin-markup
   finance.cagr
+  verification.compare
 ";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -315,6 +316,36 @@ mod tests {
             json!({"kind": "decimal", "value": "88.85", "scale": 2})
         );
         assert_eq!(response["result"]["details"]["basis"], "displayed-payment");
+        Ok(())
+    }
+
+    #[test]
+    fn computes_verification_request_through_generic_path() -> serde_json::Result<()> {
+        let request = json!({
+            "operation": "verification.compare",
+            "input": {
+                "expected": {"kind": "decimal", "value": "10.00", "scale": 2},
+                "actual": {"kind": "decimal", "value": "10.04", "scale": 2},
+                "tolerance": {
+                    "kind": "absolute",
+                    "value": {"kind": "decimal", "value": "0.05", "scale": 2}
+                }
+            },
+            "trace": true
+        })
+        .to_string();
+
+        let response = serde_json::to_value(response_from_json(&request))?;
+
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["result"]["operation"], "verification.compare");
+        assert_eq!(response["result"]["details"]["status"], "within-tolerance");
+        assert_eq!(response["result"]["details"]["passed"], true);
+        assert_eq!(
+            response["result"]["value"],
+            json!({"kind": "decimal", "value": "0.04", "scale": 2})
+        );
+        assert_eq!(response["trace"][0]["operation"], "verification.compare");
         Ok(())
     }
 

@@ -1,19 +1,27 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import {
   buildArithmeticRequest,
   buildFinanceRequest,
+  buildVerificationRequest,
   invokeComputeCli,
   resolveCliCommand,
   runProcess,
   type ProcessRunner,
 } from "./cli.js";
-import { arithmeticToolInputSchema, financeToolInputSchema } from "./schemas.js";
+import {
+  arithmeticToolInputSchema,
+  financeToolInputSchema,
+  verificationToolInputSchema,
+} from "./schemas.js";
 import {
   buildExpressionToolResult,
   buildFinanceToolResult,
   buildToolResult,
+  buildVerificationToolResult,
   type ToolPayload,
 } from "./tools.js";
 
@@ -117,6 +125,108 @@ test("buildFinanceRequest maps MCP input to compute CLI request", () => {
   });
 });
 
+test("verification schema accepts exact and tolerance comparisons", () => {
+  const exact = verificationToolInputSchema.parse({
+    expected: { kind: "integer", value: "42" },
+    actual: { kind: "integer", value: "42" },
+  });
+  const tolerant = verificationToolInputSchema.parse({
+    expected: { kind: "decimal", value: "100.00", scale: 2 },
+    actual: { kind: "decimal", value: "100.01", scale: 2 },
+    tolerance: {
+      kind: "relative",
+      value: { kind: "decimal", value: "0.001", scale: 3 },
+    },
+    trace: true,
+  });
+
+  assert.equal(exact.trace, false);
+  assert.equal(tolerant.tolerance?.kind, "relative");
+});
+
+test("verification schema rejects negative tolerance values", () => {
+  assert.throws(() =>
+    verificationToolInputSchema.parse({
+      expected: { kind: "integer", value: "42" },
+      actual: { kind: "integer", value: "41" },
+      tolerance: {
+        kind: "absolute",
+        value: { kind: "integer", value: "-1" },
+      },
+    }),
+  );
+
+  assert.throws(() =>
+    verificationToolInputSchema.parse({
+      expected: { kind: "decimal", value: "10.00", scale: 2 },
+      actual: { kind: "decimal", value: "10.01", scale: 2 },
+      tolerance: {
+        kind: "relative",
+        value: { kind: "decimal", value: "-0.01", scale: 2 },
+      },
+    }),
+  );
+});
+
+test("public JSON schemas define verification compare contract", () => {
+  const requestSchema = JSON.parse(
+    fs.readFileSync(
+      path.join(process.cwd(), "../../schemas/compute-request.schema.json"),
+      "utf8",
+    ),
+  );
+  const responseSchema = JSON.parse(
+    fs.readFileSync(
+      path.join(process.cwd(), "../../schemas/compute-response.schema.json"),
+      "utf8",
+    ),
+  );
+
+  assert.ok(requestSchema.$defs.NumericValue);
+  assert.ok(requestSchema.$defs.VerificationCompareInput);
+  assert.ok(requestSchema.$defs.VerificationTolerance);
+  assert.equal(
+    requestSchema.$defs.VerificationCompareInput.properties.tolerance.$ref,
+    "#/$defs/VerificationTolerance",
+  );
+  assert.ok(responseSchema.$defs.VerificationDetails);
+  assert.deepEqual(responseSchema.$defs.ComparisonStatus.enum, [
+    "exact-match",
+    "exact-mismatch",
+    "within-tolerance",
+    "outside-tolerance",
+  ]);
+  assert.equal(
+    responseSchema.$defs.ToleranceDetails.properties.allowedDifference.$ref,
+    "#/$defs/NumericValue",
+  );
+});
+
+test("buildVerificationRequest maps MCP input to compute CLI request", () => {
+  const request = buildVerificationRequest({
+    expected: { kind: "integer", value: "100" },
+    actual: { kind: "integer", value: "101" },
+    tolerance: {
+      kind: "absolute",
+      value: { kind: "integer", value: "1" },
+    },
+    trace: false,
+  });
+
+  assert.deepEqual(request, {
+    operation: "verification.compare",
+    input: {
+      expected: { kind: "integer", value: "100" },
+      actual: { kind: "integer", value: "101" },
+      tolerance: {
+        kind: "absolute",
+        value: { kind: "integer", value: "1" },
+      },
+    },
+    trace: false,
+  });
+});
+
 test("buildToolResult returns matching structuredContent and JSON text content", () => {
   const payload = {
     tool: "compute_arithmetic" as const,
@@ -180,6 +290,42 @@ test("buildFinanceToolResult invokes compute CLI with finance request", async ()
   assert.equal(structuredContent.tool, "calculate_finance");
   assert.equal(structuredContent.request.operation, "finance.simple-interest");
   assert.match(capturedInput, /"operation":"finance.simple-interest"/);
+  assert.equal(structuredContent.response.ok, true);
+});
+
+test("buildVerificationToolResult invokes compute CLI with verification request", async () => {
+  let capturedInput = "";
+  const runner: ProcessRunner = async (_command, _args, input) => {
+    capturedInput = input;
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        result: { operation: JSON.parse(input).operation },
+        version: "0.1.0",
+      }),
+      stderr: "",
+    };
+  };
+
+  const result = await buildVerificationToolResult(
+    {
+      expected: { kind: "integer", value: "5" },
+      actual: { kind: "integer", value: "6" },
+      tolerance: {
+        kind: "absolute",
+        value: { kind: "integer", value: "1" },
+      },
+      trace: false,
+    },
+    runner,
+    { command: "compute-cli", args: [] },
+  );
+  const structuredContent = result.structuredContent as ToolPayload;
+
+  assert.equal(structuredContent.tool, "verify_result");
+  assert.equal(structuredContent.request.operation, "verification.compare");
+  assert.match(capturedInput, /"operation":"verification.compare"/);
   assert.equal(structuredContent.response.ok, true);
 });
 

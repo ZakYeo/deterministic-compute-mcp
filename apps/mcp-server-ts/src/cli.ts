@@ -2,7 +2,11 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ArithmeticToolInput, FinanceToolInput } from "./schemas.js";
+import type {
+  ArithmeticToolInput,
+  FinanceToolInput,
+  VerificationToolInput,
+} from "./schemas.js";
 
 export type ComputeRequest = {
   operation: string;
@@ -96,6 +100,17 @@ export function buildFinanceRequest(input: FinanceToolInput): ComputeRequest {
   }
 
   return request;
+}
+
+export function buildVerificationRequest(
+  input: VerificationToolInput,
+): ComputeRequest {
+  const { trace, ...verificationInput } = input;
+  return {
+    operation: "verification.compare",
+    input: verificationInput,
+    trace: trace ?? false,
+  };
 }
 
 export function resolveCliCommand(env: NodeJS.ProcessEnv = process.env): CliCommand {

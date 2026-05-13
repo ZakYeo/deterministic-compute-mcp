@@ -6,14 +6,17 @@ import {
   arithmeticToolInputSchema,
   expressionToolInputSchema,
   financeToolInputSchema,
+  verificationToolInputSchema,
   type ArithmeticToolInput,
   type ExpressionToolInput,
   type FinanceToolInput,
+  type VerificationToolInput,
 } from "./schemas.js";
 import {
   buildArithmeticToolResult,
   buildExpressionToolResult,
   buildFinanceToolResult,
+  buildVerificationToolResult,
 } from "./tools.js";
 
 const server = new McpServer({
@@ -49,6 +52,16 @@ server.registerTool(
     inputSchema: financeToolInputSchema,
   },
   async (input: FinanceToolInput) => buildFinanceToolResult(input),
+);
+
+server.registerTool(
+  "verify_result",
+  {
+    description:
+      "Verify deterministic numeric results exactly or with absolute/relative tolerance through the Rust compute CLI.",
+    inputSchema: verificationToolInputSchema,
+  },
+  async (input: VerificationToolInput) => buildVerificationToolResult(input),
 );
 
 const transport = new StdioServerTransport();

@@ -47,3 +47,11 @@ Implemented generic compute operations include:
 Finance rates are decimal rates per period, not percentage whole numbers. Loan payments assume fixed end-of-period payments and exclude fees, taxes, escrow, and prepayments. Loan `totalPaid` and `totalInterest` are computed from the displayed rounded payment and marked with `basis: "displayed-payment"`.
 
 `finance.cagr` intentionally supports only roots exactly representable at the requested `precision.decimalPlaces`; non-exact roots return a structured `precision-issue` error.
+
+## Verification Operations
+
+Implemented generic verification operations include:
+
+- `verification.compare`
+
+`verification.compare` accepts `expected`, `actual`, and optional `tolerance`. Without tolerance it performs scale-normalized exact numeric equality. With tolerance it supports `absolute` tolerance and `relative` tolerance, where relative tolerance is applied to `abs(expected)`. The generic result `value` is the absolute difference; structured comparison status and tolerance metadata are emitted in `result.details`.
