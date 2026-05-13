@@ -182,9 +182,43 @@ Ownership note: changes stayed in `crates/compute-core/src/units/**` plus minima
 - `cargo test --workspace`: passed with 72 `compute-core` tests and 13 `compute-cli` tests.
 - `cargo clippy --workspace --all-targets -- -D warnings`: passed.
 
+## Finance Status
+
+Branch: `agent/finance`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 72/100, changes requested for public integration, CAGR exact-root overflow/cap behavior, loan summary semantics, and edge coverage.
+- Second review: 91/100, passed. Added MCP CAGR precision validation before merge.
+
+The finance module now includes:
+
+- Deterministic finance and business calculators for simple interest, compound future value, fixed loan payment, percentage change, margin/markup, and exact-representable CAGR.
+- Fixed decimal/rational arithmetic with checked overflow paths and no floating-point calculations.
+- Machine-readable finance metadata, assumptions, deterministic trace steps, and loan summary details.
+- Loan totals computed from the displayed rounded payment with `basis: "displayed-payment"`.
+- Exact-only CAGR contract documented in code, docs, schemas, and MCP tool descriptions.
+- Core generic request dispatch for arithmetic, expression, and finance operations.
+- Rust CLI finance support through the generic JSON compute request path.
+- TypeScript MCP `calculate_finance` tool, schemas, request builder, and tests.
+- Updated interface docs, JSON schemas, and example request/response files.
+
+Ownership note: the workstream expanded beyond `crates/compute-core/src/finance/**` to satisfy review-requested public integration through core dispatch, CLI, MCP, schemas, examples, and docs.
+
+## Finance Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 92 `compute-core` tests and 14 `compute-cli` tests.
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`: passed.
+- `npm --prefix apps/mcp-server-ts run typecheck`: passed.
+- `npm --prefix apps/mcp-server-ts run build`: passed.
+- `npm --prefix apps/mcp-server-ts test`: passed with 14 MCP tests.
+
 ## Next Workstreams
 
-- `agent/finance`: add finance/business calculators with documented assumptions.
 - `agent/verification`: add exact and tolerance-based result comparison.
 - `agent/test-generation`: add deterministic expected-value generation.
 - `agent/docs`: expand installation, usage, and integration docs.
