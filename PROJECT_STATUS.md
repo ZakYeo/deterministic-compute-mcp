@@ -25,9 +25,39 @@ This work intentionally avoids major product implementation.
 - `npm --prefix apps/mcp-server-ts run typecheck`: passed.
 - `npm --prefix apps/mcp-server-ts run build`: passed.
 
+## Rust Compute Core Status
+
+Branch: `agent/rust-compute-core`
+
+Status: complete and merged
+
+Review history:
+
+- Initial review: 74/100, changes requested for decimal overflow, checked division, scale validation, and edge-case coverage.
+- Second review: 86/100, changes requested for high-scale decimal division cancellation and `i128::MIN` boundary handling.
+- Third review: 88/100, changes requested for `i128::MIN` decimal wire round-trip.
+- Final review: 94/100, passed. A recommended oversized-positive decimal regression test was added before merge.
+
+The compute core now includes:
+
+- JSON-serializable request, response, result, diagnostic, trace, and structured error models.
+- Deterministic integer and fixed-scale decimal arithmetic primitives.
+- Explicit precision policy and rounding modes.
+- Basic add, subtract, multiply, and divide operations.
+- Structured invalid-input, division-by-zero, precision, and overflow errors.
+- Edge-case coverage for decimal scale validation, high-scale division cancellation, `i128` boundaries, and wire-format round trips.
+
+Ownership note: `Cargo.lock` changed outside `crates/compute-core/**` because `compute-core` added `serde` and `serde_json` dependencies.
+
+## Rust Compute Core Checks
+
+- `cargo fmt --all -- --check`: passed.
+- `cargo check --workspace`: passed.
+- `cargo test --workspace`: passed with 30 `compute-core` tests.
+- `cargo clippy --workspace --all-targets -- -D warnings`: passed.
+
 ## Next Workstreams
 
-- `agent/rust-compute-core`: implement deterministic core primitives, result models, precision policy, and tests.
 - `agent/rust-cli`: expose compute-core through a stable JSON CLI.
 - `agent/typescript-mcp-server`: implement MCP SDK wiring, tool registration, schema validation, and CLI process integration.
 - `agent/expression-engine`: add safe expression parsing, AST evaluation, and proof traces.
