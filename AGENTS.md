@@ -1,54 +1,62 @@
-# Agent Instructions
+# Repository Guidelines
 
-This repository is being built through focused worker branches. Do not revert or overwrite edits made by other agents. Keep changes scoped to the paths owned by your current assignment.
+## Project Structure & Module Organization
 
-## Product Direction
+This repository is a Rust-first deterministic compute engine with a TypeScript MCP wrapper.
 
-`deterministic-compute-mcp` is a production-grade deterministic computation engine for AI agents. It uses a Rust-first compute core with a TypeScript MCP wrapper.
+- `crates/compute-core/`: deterministic arithmetic, expression, units, finance, verification, and expected-value logic.
+- `crates/compute-cli/`: JSON CLI boundary around `compute-core`.
+- `apps/mcp-server-ts/`: TypeScript MCP stdio server, schemas, tool mapping, and MCP tests.
+- `schemas/`: JSON Schema contracts for compute request and response envelopes.
+- `examples/`: runnable JSON request/response fixtures.
+- `docs/`: architecture, interface, and roadmap notes.
 
-Primary goals:
+## Build, Test, and Development Commands
 
-- Verify calculations.
-- Generate exact expected values for tests.
-- Perform deterministic unit conversions.
-- Run finance and business calculations with explicit assumptions.
-- Compare expected and actual values.
-- Return deterministic, machine-readable outputs.
+Run Rust checks from the repository root:
 
-## Branches
-
-- `agent/foundation`
-- `agent/rust-compute-core`
-- `agent/rust-cli`
-- `agent/typescript-mcp-server`
-- `agent/expression-engine`
-- `agent/units`
-- `agent/finance`
-- `agent/verification`
-- `agent/test-generation`
-- `agent/docs`
-- `agent/integration-fixes`
-
-## Repository Structure
-
-```text
-apps/mcp-server-ts/      TypeScript MCP stdio wrapper
-crates/compute-core/     Rust compute primitives
-crates/compute-cli/      Rust CLI wrapper
-docs/                    Architecture and interface documentation
-examples/                Example requests and responses
-schemas/                 JSON schemas for planned interfaces
+```sh
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo build -p compute-cli
 ```
 
-## Engineering Rules
+Run the CLI against an example request:
 
-- Prefer small, reviewable changes.
-- Preserve deterministic behavior over convenience.
-- Keep public interfaces schema-backed and machine-readable.
-- Document precision, rounding, tolerance, and financial assumptions.
-- Add tests with feature work.
-- Run relevant checks before handing off.
+```sh
+cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/compute-request.json
+```
 
-## Context7
+Install and validate the MCP server:
 
-Use Context7 MCP to fetch current documentation whenever asking about a library, framework, SDK, API, CLI tool, or cloud service. Start with `resolve-library-id` unless an exact `/org/project` library ID is provided, then query docs with the full user question.
+```sh
+npm ci --prefix apps/mcp-server-ts
+npm --prefix apps/mcp-server-ts run typecheck
+npm --prefix apps/mcp-server-ts run build
+npm --prefix apps/mcp-server-ts test
+```
+
+Use `npm --prefix apps/mcp-server-ts run dev` for local MCP server development.
+
+## Coding Style & Naming Conventions
+
+Rust uses edition 2021 with workspace lints. `unsafe_code` is forbidden, and Clippy denies `unwrap`, `expect`, and `panic`; return structured errors instead. Keep Rust modules focused by domain and use snake_case for functions, modules, and tests.
+
+TypeScript is strict ESM (`module: NodeNext`, target `ES2022`). Keep source in `apps/mcp-server-ts/src/`, import local modules with `.js` extensions, and prefer explicit schemas/types at tool boundaries.
+
+## Testing Guidelines
+
+Place Rust unit tests in each module’s `mod tests` block and name tests after behavior, for example `division_requires_precision_for_repeating_decimal`. TypeScript tests use Node’s built-in `node:test` and live beside source as `*.test.ts`; build before running because tests execute from `dist/**/*.test.js`.
+
+Cover changes at the boundary they affect: core computation in Rust, CLI JSON behavior in `compute-cli`, and MCP validation/mapping in TypeScript.
+
+## Commit & Pull Request Guidelines
+
+Recent commits use short, imperative summaries such as `Close MVP integration gaps` and `Update user documentation and examples`. Follow that style: one concise subject, no trailing period.
+
+Pull requests should describe the behavioral change, list validation commands run, and call out schema, example, or MCP contract changes. Link related issues when available and include sample JSON or CLI output for user-visible computation changes.
+
+## Security & Configuration Tips
+
+Do not commit local MCP client configuration or secrets. If overriding the CLI used by the MCP server, prefer absolute paths via `DETERMINISTIC_COMPUTE_CLI_COMMAND` and JSON arguments via `DETERMINISTIC_COMPUTE_CLI_ARGS_JSON`.

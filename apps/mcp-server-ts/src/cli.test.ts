@@ -13,6 +13,7 @@ import {
   buildVerificationRequest,
   invokeComputeCli,
   resolveCliCommand,
+  resolvePackagedCliCommand,
   runProcess,
   type ProcessRunner,
 } from "./cli.js";
@@ -964,6 +965,65 @@ test("resolveCliCommand uses configurable command and JSON args", () => {
   });
 });
 
+test("resolvePackagedCliCommand finds platform-specific packaged binary", () => {
+  const packageRoot = fs.mkdtempSync(path.join(osTmpDir(), "compute-mcp-"));
+  const binaryPath = path.join(packageRoot, "bin", "compute-cli-linux-x64");
+  fs.mkdirSync(path.dirname(binaryPath), { recursive: true });
+  fs.writeFileSync(binaryPath, "");
+
+  const command = resolvePackagedCliCommand({
+    packageRoot,
+    platform: "linux",
+    arch: "x64",
+  });
+
+  assert.deepEqual(command, {
+    command: binaryPath,
+    args: [],
+  });
+});
+
+test("resolvePackagedCliCommand uses exe suffix for Windows binaries", () => {
+  const packageRoot = fs.mkdtempSync(path.join(osTmpDir(), "compute-mcp-"));
+  const binaryPath = path.join(packageRoot, "bin", "compute-cli-win32-x64.exe");
+  fs.mkdirSync(path.dirname(binaryPath), { recursive: true });
+  fs.writeFileSync(binaryPath, "");
+
+  const command = resolvePackagedCliCommand({
+    packageRoot,
+    platform: "win32",
+    arch: "x64",
+  });
+
+  assert.equal(command?.command, binaryPath);
+  assert.deepEqual(command?.args, []);
+});
+
+test("invokeComputeCli maps unavailable command to deterministic failure", async () => {
+  const response = await invokeComputeCli(
+    {
+      operation: "arithmetic.add",
+      input: {
+        left: { kind: "integer", value: "1" },
+        right: { kind: "integer", value: "2" },
+      },
+      trace: false,
+    },
+    async () => {
+      throw new Error("runner should not be called");
+    },
+    {
+      command: "",
+      args: [],
+      unavailableReason: "missing binary",
+    },
+  );
+
+  assert.equal(response.ok, false);
+  assert.equal(response.error?.code, "cli-unavailable");
+  assert.equal(response.error?.detail, "missing binary");
+});
+
 test("example JSON files are valid", () => {
   const examplesDir = path.join(repoRoot, "examples");
   for (const fileName of fs.readdirSync(examplesDir)) {
@@ -974,3 +1034,7 @@ test("example JSON files are valid", () => {
     }
   }
 });
+
+function osTmpDir(): string {
+  return process.env.TMPDIR ?? "/tmp";
+}

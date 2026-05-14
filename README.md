@@ -28,7 +28,6 @@ The Rust core owns computation correctness. The CLI owns the stable process cont
 
 - Rust toolchain compatible with workspace `rust-version = "1.76"`.
 - Node.js `>=20` and npm for the MCP server.
-- A local checkout of this repository.
 
 Install TypeScript dependencies:
 
@@ -125,6 +124,26 @@ Finance rates are decimal rates per period, not percentage whole numbers. VAT ra
 `verification.compare` returns the absolute difference as `result.value` and comparison metadata in `result.details`. `test-generation.generate-expected-values` evaluates bounded explicit cases through the same dispatcher and returns nested deterministic responses in `result.details.cases`.
 
 ## MCP Server Usage
+
+### Install In Codex
+
+After the npm package is published, add the MCP server to Codex with:
+
+```sh
+codex mcp add deterministic-compute -- npx -y @deterministic-compute/mcp-server
+```
+
+Restart Codex, then run `/mcp` in the TUI or `codex mcp list` to verify the server is enabled. Codex stores the entry in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.deterministic-compute]
+command = "npx"
+args = ["-y", "@deterministic-compute/mcp-server"]
+```
+
+The current npm package build is intended for Linux x64 testing and ships the TypeScript stdio server plus `compute-cli-linux-x64`. Other platforms can still use the MCP wrapper by building `compute-cli` locally and setting `DETERMINISTIC_COMPUTE_CLI_COMMAND` to its absolute path.
+
+### Local Checkout
 
 Build the server:
 

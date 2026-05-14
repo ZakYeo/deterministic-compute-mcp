@@ -1,13 +1,32 @@
 {
   "name": "@deterministic-compute/mcp-server",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "description": "Deterministic compute MCP stdio server for Codex and other MCP clients.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZakYeo/deterministic-compute-mcp.git",
+    "directory": "apps/mcp-server-ts"
+  },
   "type": "module",
   "bin": {
     "deterministic-compute-mcp": "./dist/index.js"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "!dist/**/*.test.js",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:cli": "node scripts/stage-cli.mjs",
+    "build:package": "npm run build:cli && npm run build",
+    "prepack": "npm run build:package",
+    "pack:dry-run": "npm pack --dry-run",
     "test": "node --test dist/**/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx src/index.ts"

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -43,7 +44,8 @@ export type CliFailure = {
       | "cli-execution-failed"
       | "cli-invalid-json"
       | "cli-timeout"
-      | "cli-output-too-large";
+      | "cli-output-too-large"
+      | "cli-unavailable";
     message: string;
     detail?: string;
   };
@@ -55,6 +57,7 @@ export type CliResult = ComputeResponse | CliFailure;
 export type CliCommand = {
   command: string;
   args: string[];
+  unavailableReason?: string;
 };
 
 export type ProcessResult = {
@@ -176,13 +179,30 @@ export function resolveCliCommand(env: NodeJS.ProcessEnv = process.env): CliComm
     };
   }
 
+  const packagedCommand = resolvePackagedCliCommand();
+  if (packagedCommand) {
+    return packagedCommand;
+  }
+
+  const manifestPath = path.join(repoRoot(), "crates/compute-cli/Cargo.toml");
+  if (!fs.existsSync(manifestPath)) {
+    return {
+      command: "",
+      args: [],
+      unavailableReason:
+        `No packaged compute CLI binary was found for ${process.platform}-${process.arch}. ` +
+        "Install a package version that includes this platform, or set " +
+        "DETERMINISTIC_COMPUTE_CLI_COMMAND to an absolute compute-cli binary path.",
+    };
+  }
+
   return {
     command: "cargo",
     args: [
       "run",
       "--quiet",
       "--manifest-path",
-      path.join(repoRoot(), "crates/compute-cli/Cargo.toml"),
+      manifestPath,
       "--",
     ],
   };
@@ -193,6 +213,18 @@ export async function invokeComputeCli(
   runner: ProcessRunner = runProcess,
   commandConfig: CliCommand = resolveCliCommand(),
 ): Promise<CliResult> {
+  if (commandConfig.unavailableReason) {
+    return {
+      ok: false,
+      error: {
+        code: "cli-unavailable",
+        message: "compute CLI is unavailable",
+        detail: commandConfig.unavailableReason,
+      },
+      version: "mcp-wrapper",
+    };
+  }
+
   const input = `${JSON.stringify(request)}\n`;
   const processResult = await runner(commandConfig.command, commandConfig.args, input);
 
@@ -362,4 +394,31 @@ function parseArgsJson(value: string | undefined): string[] {
 
 function repoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+}
+
+export function resolvePackagedCliCommand(
+  options: {
+    packageRoot?: string;
+    platform?: NodeJS.Platform;
+    arch?: string;
+  } = {},
+): CliCommand | undefined {
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const extension = platform === "win32" ? ".exe" : "";
+  const binaryName = `compute-cli-${platform}-${arch}${extension}`;
+  const command = path.join(options.packageRoot ?? packageRoot(), "bin", binaryName);
+
+  if (!fs.existsSync(command)) {
+    return undefined;
+  }
+
+  return {
+    command,
+    args: [],
+  };
+}
+
+function packageRoot(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 }
