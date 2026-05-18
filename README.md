@@ -1,65 +1,156 @@
 # deterministic-compute-mcp
 
-`deterministic-compute-mcp` is a Rust-first deterministic computation engine with a TypeScript MCP wrapper for agent workflows. It gives Codex users a local tool for exact numeric calculations, finance/business math, result verification, and expected-value generation with machine-readable JSON output.
+Deterministic compute for AI agents.
 
-The project currently implements the Rust compute core, JSON CLI, and MCP stdio wrapper for the exposed operations below.
+`deterministic-compute-mcp` is an MCP server that gives Codex, Claude, and other MCP clients a local, exact, machine-readable calculator for work where "close enough" is not good enough: arithmetic, business math, unit conversion, result verification, and repeatable expected-value generation.
 
-## Implemented Status
+The project is Rust-first for correctness and exposes a TypeScript stdio MCP server for agent workflows. It is currently pre-release: the core, CLI, MCP wrapper, schemas, examples, and tests are implemented, while broad release packaging and client-specific polish are still active contribution areas.
 
-- Rust core: JSON-safe integer and fixed-scale decimal arithmetic, expression evaluation, unit conversion, finance calculators, verification, and expected-value generation.
-- Rust CLI: reads a compute request from stdin or a file and writes a `ComputeResponse` JSON document.
-- TypeScript MCP server: exposes agent tools for arithmetic, expressions, unit conversion, finance, verification, and expected-value generation through the Rust CLI.
-- Schemas/examples/docs: describe the generic request/response contracts and runnable example payloads.
+## Features
 
-## Architecture
+- Exact JSON-safe integers and fixed-scale decimals.
+- Deterministic arithmetic: add, subtract, multiply, divide.
+- Arithmetic expression evaluation with `+`, `-`, `*`, `/`, parentheses, and unary minus.
+- Unit conversion for length, mass, time, and temperature.
+- Finance and business calculators:
+  - simple interest
+  - compound interest
+  - fixed loan payment
+  - VAT
+  - percentage change
+  - margin and markup
+  - exact-representable CAGR
+- Result verification with exact, absolute-tolerance, and relative-tolerance comparisons.
+- Expected-value generation over explicit bounded test cases.
+- Stable JSON CLI boundary for scripts, tests, and non-MCP integrations.
+- MCP tools with both text JSON and structured content responses.
 
-```text
-apps/mcp-server-ts/      TypeScript MCP stdio wrapper
-crates/compute-core/     Rust deterministic compute primitives and dispatcher
-crates/compute-cli/      Rust JSON CLI process boundary
-docs/                    Architecture and interface documentation
-examples/                Runnable JSON compute requests and sample response
-schemas/                 JSON schemas for compute requests and responses
-```
+## Why Agents Need This
 
-The Rust core owns computation correctness. The CLI owns the stable process contract. The MCP server owns agent-facing tool registration, input validation, and CLI invocation.
+LLMs are useful at reasoning, but they should not be trusted to mentally calculate finance, verify numeric outputs, or generate golden test values. This server gives agents a deterministic compute tool with explicit precision, rounding, schemas, structured errors, and repeatable responses.
 
-## Prerequisites
+Use it when an agent needs to:
+
+- calculate exact numeric results;
+- verify a proposed answer against expected values;
+- generate deterministic fixtures for tests;
+- explain or audit business math;
+- keep calculations local instead of sending them to a hosted service.
+
+## Current Status
+
+Implemented:
+
+- Rust compute core in `crates/compute-core/`.
+- Rust JSON CLI in `crates/compute-cli/`.
+- TypeScript MCP stdio server in `apps/mcp-server-ts/`.
+- JSON schemas in `schemas/`.
+- Runnable examples in `examples/`.
+- Interface and architecture docs in `docs/`.
+
+Pre-release notes:
+
+- The npm package name is `@deterministic-compute/mcp-server`.
+- The current package flow is intended for pre-release testing and Linux x64 packaged CLI work.
+- Other platforms can use the MCP wrapper by building `compute-cli` locally and pointing the server at that binary.
+- Contributions to packaging, cross-platform binaries, and client setup docs are welcome.
+
+## MCP Tools
+
+The server registers these tools:
+
+- `compute_arithmetic`: exact add, subtract, multiply, and divide.
+- `compute_expression`: deterministic arithmetic expressions.
+- `convert_units`: deterministic unit conversion.
+- `calculate_finance`: finance and business calculators.
+- `verify_result`: exact and tolerance-based comparisons.
+- `generate_expected_values`: deterministic expected values for supported operations.
+
+## Quick Start From Source
+
+Requirements:
 
 - Rust toolchain compatible with workspace `rust-version = "1.76"`.
-- Node.js `>=20` and npm for the MCP server.
+- Node.js `>=20`.
+- npm.
 
-Install TypeScript dependencies:
+Install dependencies and build:
 
 ```sh
 npm ci --prefix apps/mcp-server-ts
-```
-
-## Build And Test
-
-Rust:
-
-```sh
-cargo fmt --all -- --check
-cargo check --workspace
-cargo test --workspace
 cargo build -p compute-cli
+npm --prefix apps/mcp-server-ts run build
 ```
 
-TypeScript MCP server:
+Run the MCP server from the local checkout:
 
 ```sh
-npm --prefix apps/mcp-server-ts run typecheck
-npm --prefix apps/mcp-server-ts run build
-npm --prefix apps/mcp-server-ts test
+DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli" \
+DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]' \
+node apps/mcp-server-ts/dist/index.js
 ```
+
+The server uses stdio, so it is normally launched by an MCP client rather than run directly in a terminal session.
+
+## Use With Codex
+
+For local development, build the CLI and server first:
+
+```sh
+cargo build -p compute-cli
+npm --prefix apps/mcp-server-ts run build
+```
+
+Then add the checkout-backed server:
+
+```sh
+codex mcp add deterministic-compute-local \
+  --env DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli" \
+  --env DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]' \
+  -- node "$PWD/apps/mcp-server-ts/dist/index.js"
+```
+
+Restart Codex, then run `/mcp` in the TUI or:
+
+```sh
+codex mcp list
+```
+
+The target package install command is:
+
+```sh
+codex mcp add deterministic-compute -- npx -y @deterministic-compute/mcp-server
+```
+
+Use the source-based setup above until release packaging for your platform is available.
+
+## Use With Claude Desktop
+
+Build the local CLI and MCP server, then add a stdio server entry to your Claude Desktop MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "deterministic-compute": {
+      "command": "node",
+      "args": ["/absolute/path/to/deterministic-compute-mcp/apps/mcp-server-ts/dist/index.js"],
+      "env": {
+        "DETERMINISTIC_COMPUTE_CLI_COMMAND": "/absolute/path/to/deterministic-compute-mcp/target/debug/compute-cli",
+        "DETERMINISTIC_COMPUTE_CLI_ARGS_JSON": "[]"
+      }
+    }
+  }
+}
+```
+
+Use absolute paths because MCP clients may launch servers from a different working directory.
 
 ## CLI Usage
 
-Run with a request file:
+Run a request file:
 
 ```sh
-cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/compute-request.json
+cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/arithmetic-request.json
 ```
 
 Run with stdin:
@@ -69,13 +160,7 @@ printf '%s\n' '{"operation":"arithmetic.add","input":{"left":{"kind":"integer","
   | cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml --
 ```
 
-After building the CLI, you can run the binary directly:
-
-```sh
-target/debug/compute-cli examples/compute-request.json
-```
-
-Requests have this shape:
+Example request:
 
 ```json
 {
@@ -92,169 +177,71 @@ Requests have this shape:
 }
 ```
 
-The JSON Schema validates the generic request envelope and includes operation-specific branches for units, VAT, verification, and expected-value generation. Arithmetic, expression, and other finance input payloads are validated by the Rust core and MCP schemas at runtime.
-
 Numbers are JSON-safe tagged values:
 
-- Integer: `{ "kind": "integer", "value": "42" }`
-- Decimal: `{ "kind": "decimal", "value": "0.05", "scale": 2 }`
-
-`scale` must equal the number of fractional digits in the decimal string. Supported rounding modes are `exact`, `truncate`, and `half-away-from-zero`.
-
-## Supported CLI Operations
-
-- `arithmetic.add`
-- `arithmetic.subtract`
-- `arithmetic.multiply`
-- `arithmetic.divide`
-- `expression.evaluate`
-- `units.convert`
-- `finance.simple-interest`
-- `finance.compound-interest`
-- `finance.loan-payment`
-- `finance.vat`
-- `finance.percentage-change`
-- `finance.margin-markup`
-- `finance.cagr`
-- `verification.compare`
-- `test-generation.generate-expected-values`
-
-Finance rates are decimal rates per period, not percentage whole numbers. VAT rates are also decimal rates; for example, 20% VAT is `0.20`. `finance.vat` computes from a non-negative net amount and returns machine-readable `netAmount`, `vatAmount`, and `grossAmount` details. When output rounding is requested, `grossAmount` is the displayed `netAmount + vatAmount` so returned components stay internally consistent. CAGR requires `precision.decimalPlaces` and returns a `precision-issue` error when the root is not exactly representable at that scale.
-
-`verification.compare` returns the absolute difference as `result.value` and comparison metadata in `result.details`. `test-generation.generate-expected-values` evaluates bounded explicit cases through the same dispatcher and returns nested deterministic responses in `result.details.cases`.
-
-## MCP Server Usage
-
-### Install In Codex
-
-After the npm package is published, add the MCP server to Codex with:
-
-```sh
-codex mcp add deterministic-compute -- npx -y @deterministic-compute/mcp-server
+```json
+{ "kind": "integer", "value": "42" }
 ```
-
-Restart Codex, then run `/mcp` in the TUI or `codex mcp list` to verify the server is enabled. Codex stores the entry in `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.deterministic-compute]
-command = "npx"
-args = ["-y", "@deterministic-compute/mcp-server"]
-```
-
-The current npm package build is intended for Linux x64 testing and ships the TypeScript stdio server plus `compute-cli-linux-x64`. Other platforms can still use the MCP wrapper by building `compute-cli` locally and setting `DETERMINISTIC_COMPUTE_CLI_COMMAND` to its absolute path.
-
-### Local Checkout
-
-Build the server:
-
-```sh
-npm --prefix apps/mcp-server-ts run build
-```
-
-Run the stdio server:
-
-```sh
-node apps/mcp-server-ts/dist/index.js
-```
-
-By default the wrapper invokes:
-
-```sh
-cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml --
-```
-
-To use a prebuilt CLI binary, set:
-
-```sh
-export DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli"
-export DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]'
-```
-
-Use an absolute CLI path when an MCP client may launch the server from a different working directory.
-
-Registered MCP tools:
-
-- `compute_arithmetic`: `add`, `subtract`, `multiply`, `divide`.
-- `compute_expression`: deterministic arithmetic expressions.
-- `convert_units`: deterministic unit conversion.
-- `calculate_finance`: simple interest, compound interest, loan payment, VAT, percentage change, margin/markup, CAGR.
-- `verify_result`: exact, absolute-tolerance, and relative-tolerance comparisons.
-- `generate_expected_values`: deterministic expected values for supported compute operations.
-
-Example MCP tool input for arithmetic:
 
 ```json
-{
-  "operation": "divide",
-  "operands": [
-    { "kind": "integer", "value": "2" },
-    { "kind": "integer", "value": "3" }
-  ],
-  "precision": {
-    "decimalPlaces": 2,
-    "rounding": "half-away-from-zero"
-  },
-  "trace": true
-}
+{ "kind": "decimal", "value": "0.05", "scale": 2 }
 ```
 
-Tool results include both JSON text content and `structuredContent` with the wrapper tool name, generated CLI request, and CLI response.
+Decimal `scale` must match the number of fractional digits in `value`. Supported rounding modes are `exact`, `truncate`, and `half-away-from-zero`.
 
-### Real Codex Smoke Test
+## Development
 
-From a local checkout with Codex already authenticated, run:
+Rust checks:
+
+```sh
+cargo fmt --all -- --check
+cargo check --workspace
+cargo test --workspace
+cargo build -p compute-cli
+```
+
+TypeScript MCP checks:
+
+```sh
+npm ci --prefix apps/mcp-server-ts
+npm --prefix apps/mcp-server-ts run typecheck
+npm --prefix apps/mcp-server-ts run build
+npm --prefix apps/mcp-server-ts test
+```
+
+Run the real Codex smoke test from a local checkout with Codex already authenticated:
 
 ```sh
 scripts/codex-mcp-smoke.sh
 ```
 
-The script builds `target/debug/compute-cli`, builds the TypeScript MCP server, and starts `codex exec` with a transient `deterministic-compute-local` MCP server configuration. It asks Codex to call every registered deterministic compute MCP tool once, validates representative results, and does not edit `~/.codex/config.toml`.
+## Contributing
 
-To run the same transient configuration manually:
+Contributions are welcome. Good first areas:
 
-```sh
-codex exec \
-  -C "$PWD" \
-  -c 'mcp_servers.deterministic-compute-local.command="node"' \
-  -c "mcp_servers.deterministic-compute-local.args=[\"$PWD/apps/mcp-server-ts/dist/index.js\"]" \
-  -c "mcp_servers.deterministic-compute-local.env.DETERMINISTIC_COMPUTE_CLI_COMMAND=\"$PWD/target/debug/compute-cli\"" \
-  -c 'mcp_servers.deterministic-compute-local.env.DETERMINISTIC_COMPUTE_CLI_ARGS_JSON="[]"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.compute_arithmetic.approval_mode="approve"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.compute_expression.approval_mode="approve"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.convert_units.approval_mode="approve"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.calculate_finance.approval_mode="approve"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.verify_result.approval_mode="approve"' \
-  -c 'mcp_servers.deterministic-compute-local.tools.generate_expected_values.approval_mode="approve"' \
-  'Call each registered deterministic-compute-local MCP tool once with representative exact inputs and return compact JSON containing the result values.'
+- cross-platform release packaging for the Rust CLI and MCP server;
+- setup docs for Codex, Claude Desktop, Cursor, and other MCP clients;
+- more unit conversions and finance calculators;
+- stronger schema coverage and examples;
+- resource-limit and security review;
+- real-world agent workflow smoke tests.
+
+Please keep computation deterministic, avoid floating-point math in core calculations, return structured errors, and add tests at the boundary your change affects.
+
+## Repository Layout
+
+```text
+apps/mcp-server-ts/      TypeScript MCP stdio wrapper
+crates/compute-core/     Deterministic compute primitives and dispatcher
+crates/compute-cli/      JSON CLI process boundary
+docs/                    Architecture, interfaces, and roadmap
+examples/                Runnable request and response fixtures
+schemas/                 JSON Schema contracts
 ```
 
-For persistent local testing, install the same checkout-backed server in Codex:
+## More Docs
 
-```sh
-codex mcp add deterministic-compute-local \
-  --env DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli" \
-  --env DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]' \
-  -- node "$PWD/apps/mcp-server-ts/dist/index.js"
-```
-
-For unattended `codex exec` checks against a persistent server, configure the tested tool with `approval_mode = "approve"` in Codex config.
-
-## Examples
-
-Runnable request files are in `examples/`:
-
-- `arithmetic-request.json`
-- `expression-request.json`
-- `units-request.json`
-- `vat-request.json`
-- `compute-request.json`
-- `verification-request.json`
-- `generate-expected-values-request.json`
-
-Run any request with:
-
-```sh
-cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/arithmetic-request.json
-```
-
-See [docs/interfaces.md](docs/interfaces.md) for operation-specific payloads and [docs/architecture.md](docs/architecture.md) for integration boundaries.
+- [Architecture](docs/architecture.md)
+- [Interfaces](docs/interfaces.md)
+- [Roadmap](docs/roadmap.md)
+- [Examples](examples/README.md)
