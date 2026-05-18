@@ -1,0 +1,4 @@
+interface:
+  display_name: "Expected Value Generation"
+  short_description: "Generate deterministic test fixtures"
+  default_prompt: "Use $expected-value-generation to produce deterministic expected values for these test cases."

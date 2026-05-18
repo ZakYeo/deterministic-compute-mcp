@@ -1,0 +1,4 @@
+interface:
+  display_name: "Numeric Result Verification"
+  short_description: "Verify numeric outputs with MCP"
+  default_prompt: "Use $numeric-result-verification to check whether this numeric result is correct."

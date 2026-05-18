@@ -53,7 +53,7 @@ Pre-release notes:
 - The npm package name is `@deterministic-compute/mcp-server`.
 - The current package flow is intended for pre-release testing and Linux x64 packaged CLI work.
 - Other platforms can use the MCP wrapper by building `compute-cli` locally and pointing the server at that binary.
-- Contributions to packaging, cross-platform binaries, and client setup docs are welcome.
+- Contributions to npm release packaging, cross-platform binaries, skills/plugins, and client setup docs are welcome.
 
 ## MCP Tools
 
@@ -65,6 +65,16 @@ The server registers these tools:
 - `calculate_finance`: finance and business calculators.
 - `verify_result`: exact and tolerance-based comparisons.
 - `generate_expected_values`: deterministic expected values for supported operations.
+
+## Agent Skills
+
+This repository also ships repo-local skills in `.agents/skills/`. They are the workflow layer that teaches Codex-style agents when and how to use the MCP tools:
+
+- `deterministic-finance`: calculate and explain VAT, interest, loan payments, percentage change, margin/markup, and CAGR.
+- `numeric-result-verification`: compare expected and actual numeric results with exact, absolute-tolerance, or relative-tolerance checks.
+- `expected-value-generation`: create deterministic expected outputs for tests, examples, and golden fixtures.
+
+The MCP server provides the tools; skills provide the operating procedure. Over time these can be bundled into platform-specific plugin packages for Codex, Claude, and other agent clients.
 
 ## Quick Start From Source
 
@@ -213,6 +223,12 @@ Run the real Codex smoke test from a local checkout with Codex already authentic
 
 ```sh
 scripts/codex-mcp-smoke.sh
+```
+
+Run the skills plus MCP smoke test:
+
+```sh
+scripts/codex-skills-mcp-smoke.sh
 ```
 
 ## Contributing

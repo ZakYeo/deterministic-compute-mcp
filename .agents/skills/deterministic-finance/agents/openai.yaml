@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deterministic Finance"
+  short_description: "Exact finance calculations with MCP"
+  default_prompt: "Use $deterministic-finance to calculate and verify this finance result deterministically."

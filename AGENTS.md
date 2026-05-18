@@ -49,6 +49,8 @@ cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml -- examples/comp
 - Put Rust unit tests in each module's `mod tests`.
 - Put TypeScript tests beside source as `*.test.ts`; build before running because tests execute from `dist/**/*.test.js`.
 - Cover the boundary affected by the change: Rust core, CLI JSON behavior, MCP mapping, schemas, or examples.
+- When MCP tools are added or changed, update the relevant `.agents/skills/*/SKILL.md` workflow guidance and run the skill-aware smoke test: `scripts/codex-skills-mcp-smoke.sh`.
+- If tool input/output contracts change, update MCP tests, schemas/examples/docs, and the skill smoke test expectations together.
 
 ## Security And Config
 
