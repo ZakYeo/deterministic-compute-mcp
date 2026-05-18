@@ -200,6 +200,45 @@ Example MCP tool input for arithmetic:
 
 Tool results include both JSON text content and `structuredContent` with the wrapper tool name, generated CLI request, and CLI response.
 
+### Real Codex Smoke Test
+
+From a local checkout with Codex already authenticated, run:
+
+```sh
+scripts/codex-mcp-smoke.sh
+```
+
+The script builds `target/debug/compute-cli`, builds the TypeScript MCP server, and starts `codex exec` with a transient `deterministic-compute-local` MCP server configuration. It asks Codex to call every registered deterministic compute MCP tool once, validates representative results, and does not edit `~/.codex/config.toml`.
+
+To run the same transient configuration manually:
+
+```sh
+codex exec \
+  -C "$PWD" \
+  -c 'mcp_servers.deterministic-compute-local.command="node"' \
+  -c "mcp_servers.deterministic-compute-local.args=[\"$PWD/apps/mcp-server-ts/dist/index.js\"]" \
+  -c "mcp_servers.deterministic-compute-local.env.DETERMINISTIC_COMPUTE_CLI_COMMAND=\"$PWD/target/debug/compute-cli\"" \
+  -c 'mcp_servers.deterministic-compute-local.env.DETERMINISTIC_COMPUTE_CLI_ARGS_JSON="[]"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.compute_arithmetic.approval_mode="approve"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.compute_expression.approval_mode="approve"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.convert_units.approval_mode="approve"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.calculate_finance.approval_mode="approve"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.verify_result.approval_mode="approve"' \
+  -c 'mcp_servers.deterministic-compute-local.tools.generate_expected_values.approval_mode="approve"' \
+  'Call each registered deterministic-compute-local MCP tool once with representative exact inputs and return compact JSON containing the result values.'
+```
+
+For persistent local testing, install the same checkout-backed server in Codex:
+
+```sh
+codex mcp add deterministic-compute-local \
+  --env DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli" \
+  --env DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]' \
+  -- node "$PWD/apps/mcp-server-ts/dist/index.js"
+```
+
+For unattended `codex exec` checks against a persistent server, configure the tested tool with `approval_mode = "approve"` in Codex config.
+
 ## Examples
 
 Runnable request files are in `examples/`:

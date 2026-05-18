@@ -52,6 +52,27 @@ When no packaged native binary is present, the server falls back to:
 cargo run --quiet --manifest-path crates/compute-cli/Cargo.toml --
 ```
 
+## Real Codex Smoke Test
+
+From the repository root, with Codex already authenticated:
+
+```sh
+scripts/codex-mcp-smoke.sh
+```
+
+This builds the local Rust CLI and TypeScript server, then runs `codex exec` with a transient `deterministic-compute-local` stdio MCP server. The smoke test asks Codex to call every registered MCP tool once, validates representative arithmetic, expression, unit conversion, finance, verification, and expected-value results, and does not persist any MCP configuration.
+
+The transient command marks the deterministic compute tools as approved for the run so non-interactive `codex exec` can complete the tool calls.
+
+To attach the local checkout persistently for manual Codex sessions:
+
+```sh
+codex mcp add deterministic-compute-local \
+  --env DETERMINISTIC_COMPUTE_CLI_COMMAND="$PWD/target/debug/compute-cli" \
+  --env DETERMINISTIC_COMPUTE_CLI_ARGS_JSON='[]' \
+  -- node "$PWD/apps/mcp-server-ts/dist/index.js"
+```
+
 ## Release Packaging
 
 The current test package stages the Linux x64 Rust CLI binary and builds the TypeScript server:
